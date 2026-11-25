@@ -13,12 +13,17 @@ runs as a static site (GitHub Pages).
 
 ```
 drought-watch/
-├── index.html              page layout: map, warning card, charts
+├── index.html              page layout: map, warning card, timeline, charts
+├── tests.html              automatic tests of the science code (open in the browser)
+├── sw.js                   offline support (service worker)
+├── manifest.webmanifest    lets phones install the app on the home screen
+├── icons/icon.svg          app icon
 ├── css/style.css           design (mobile first)
 ├── js/
 │   ├── app.js              connects everything: input → data → analysis → screen
 │   ├── data.js             THE ONLY place that loads data (swap for a live API later)
 │   ├── analysis.js         the science: normal range, anomaly (z-score), traffic light
+│   ├── visuals.js          wilting-plant picture, anomaly meters, season timeline
 │   ├── charts.js           NDVI/NDMI line charts (Chart.js)
 │   ├── map.js              world map (Leaflet + OpenStreetMap), loaded only when shown
 │   ├── geocode.js          place search (Nominatim)
@@ -57,9 +62,36 @@ a minimum SD of 0.02 (about Sentinel-2's measurement noise), so a lucky
 near-zero SD from few years cannot create false alarms. All settings are at the
 top of `js/analysis.js`.
 
-The **slider** replays the season: the app only uses pictures up to the chosen
+**Early-warning lead time.** When greenness (NDVI) first turns red, the app
+looks back to when leaf water (NDMI) started to be below normal and shows the
+number of days in between. Leaves lose water before they lose colour, so this
+is the head start the warning gives. In the sample fields it is about a month.
+
+The **slider** (or a click on the season timeline) replays the season: the app only uses pictures up to the chosen
 date, so it shows exactly what it would have said on that day. That lets you
 measure how early the warning came.
+
+## What the screen shows
+
+- **Warning card:** a plant that stands up (✓ healthy), bends (! watch) or
+  wilts in dry soil (✕ drought stress), the level in one word, one sentence of
+  advice, and two meters showing how many standard deviations NDMI and NDVI
+  are from normal. The meter zones use the same −1/−2 limits as the rule.
+- **Season at a glance:** one bar per 10-day period. Taller bar = stronger
+  warning, so it also works without colour vision. Click a bar to jump there.
+- **Charts:** this season against the normal range; the growing season is
+  unshaded, the rest is lightly shaded.
+- **Show the numbers:** the same data as a table (screen readers, checking).
+- **Map:** satellite picture (Sentinel-2 cloudless) or street map; your choice
+  is remembered. The location button finds the test field nearest to you.
+
+## Tests
+
+Open <http://localhost:8000/tests.html> while the local server runs. It checks
+the calendar, the average/SD/z-score, every part of the warning rule (yellow,
+red only twice in a row, cloudy gaps, SD minimum, too few normal years), the
+lead time, the CSV reader and the distance formula with small examples whose
+answers are known. All 31 should pass.
 
 ## Run it on your computer
 
@@ -146,6 +178,14 @@ Copy the `en` block in `js/lang.js`, rename it (e.g. `fr`) and translate the
 right-hand side. Add the language to the `name`/`short` texts in
 `fields.json`. The language menu shows it automatically.
 
+## Offline and installing on a phone
+
+`sw.js` saves the app and the field data on the device after the first visit,
+so it opens without internet (the map pictures and place search still need
+internet). It works on GitHub Pages and on `localhost`. When you change files,
+raise `VERSION` at the top of `sw.js` so phones throw away the old copy.
+On a phone, "Add to Home Screen" installs it like an app.
+
 ## Light mode
 
 "Light mode (no map)" hides the map and never downloads the map library or
@@ -154,6 +194,9 @@ map tiles. It turns on by itself when the browser reports "data saver" or a
 
 ## Credits and limits
 
+- Satellite map: Sentinel-2 cloudless 2020 by EOX IT Services GmbH
+  (contains modified Copernicus Sentinel data 2020), licensed CC BY-NC-SA 4.0:
+  free for non-commercial use such as a science fair, with attribution.
 - Map © OpenStreetMap contributors. Place search: Nominatim (at most one search
   per second; the app only searches when you press Search).
 - Libraries from CDNs: Chart.js 4.4.1 (jsDelivr), Leaflet 1.9.4 (unpkg).

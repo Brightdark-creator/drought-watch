@@ -6,7 +6,8 @@
   <title>Drought Watch</title>
   <meta name="description" content="Free drought early warning for crop fields from Sentinel-2 satellite data.">
   <meta name="theme-color" content="#1f6f50">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%231f6f50'/%3E%3Cpath d='M9 22c0-8 6-13 14-13 0 8-5 14-13 14' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/style.css">
   <!-- Chart.js draws the line charts. Leaflet (the map) is loaded later by js/map.js, and never in light mode. -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
@@ -15,7 +16,7 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#1f6f50"/><path d="M9 22c0-8 6-13 14-13 0 8-5 14-13 14" fill="#fff"/></svg>
+      <img class="logo" src="icons/icon.svg" alt="" width="36" height="36">
       <div>
         <h1 data-i18n="appTitle">Drought Watch</h1>
         <p class="tagline" data-i18n="tagline"></p>
@@ -34,6 +35,9 @@
     <form id="search" class="search" role="search">
       <label class="visually-hidden" for="search-input" data-i18n="searchLabel"></label>
       <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder">
+      <button type="button" id="locate" class="icon-button" data-i18n-aria-label="locate" data-i18n-title="locate">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
       <button type="submit" data-i18n="searchButton">Search</button>
     </form>
 
@@ -53,6 +57,11 @@
     <!-- 3. Charts -->
     <section id="details" class="details" hidden>
       <div class="controls">
+        <div class="timeline-box">
+          <h3 data-i18n="timelineTitle"></h3>
+          <div id="timeline" class="timeline"></div>
+          <p class="hint" data-i18n="timelineHint"></p>
+        </div>
         <div class="replay">
           <label id="period-label" for="period-slider"></label>
           <input id="period-slider" type="range" step="1">
@@ -77,6 +86,10 @@
         <div class="chart-wrap"><canvas id="chart-ndvi" role="img"></canvas></div>
       </figure>
       <ul id="legend" class="legend"></ul>
+      <details class="table-box">
+        <summary data-i18n="tableShow"></summary>
+        <div id="table-wrap" class="table-wrap"></div>
+      </details>
     </section>
 
     <details class="explain">

@@ -75,7 +75,8 @@ export function formatNumber(value, digits = 2, extra = {}) {
 
 /** e.g. "−2.4" or "+0.3" with the correct minus sign and decimal comma for German. */
 export function formatSigned(value, digits = 1) {
-  return formatNumber(value, digits, { signDisplay: 'exceptZero' });
+  // Use a real minus sign (−), which is easier to read than a hyphen (-).
+  return formatNumber(value, digits, { signDisplay: 'exceptZero' }).replace('-', '\u2212');
 }
 
 export function formatKm(km) {

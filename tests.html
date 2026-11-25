@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drought Watch tests</title>
+  <style>
+    :root { --bg: #f3f5f2; --text: #1c2321; --muted: #59645f; --ok: #1a7f37; --bad: #c62828; }
+    body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+    main { max-width: 820px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    p { color: var(--muted); margin: 0 0 16px; }
+    #summary { font-size: 1.2rem; font-weight: 700; margin: 12px 0; }
+    li { margin: 4px 0; list-style: none; }
+    li::before { display: inline-block; width: 1.4em; font-weight: 800; }
+    li.ok::before { content: "✓"; color: var(--ok); }
+    li.bad::before { content: "✕"; color: var(--bad); }
+    li.bad { color: var(--bad); }
+    ul { padding: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Drought Watch — automatic tests</h1>
+  <p>These tests check the science code (js/analysis.js) and the file reader (js/data.js) with small made-up examples where the right answer is known. Open this page through the local server, e.g. http://localhost:8000/tests.html.</p>
+  <div id="summary">Running…</div>
+  <ul id="results"></ul>
+</main>
+<script type="module">
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, SD_FLOOR } from './js/analysis.js';
+  import { parseCsv, distanceKm } from './js/data.js';
+
+  const results = [];
+  function check(name, condition, detail = '') {
+    results.push({ name, ok: !!condition, detail });
+  }
+  const close = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+  const day = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+
+  /* ---------- Calendar ---------- */
+  check('1 January is period 0', seasonAndPeriod(day(2018, 1, 1)).period === 0);
+  check('10 January is still period 0', seasonAndPeriod(day(2018, 1, 10)).period === 0);
+  check('11 January is period 1', seasonAndPeriod(day(2018, 1, 11)).period === 1);
+  check('31 January is period 2 (the 3rd period runs to the end of the month)', seasonAndPeriod(day(2018, 1, 31)).period === 2);
+  check('31 December is period 35', seasonAndPeriod(day(2018, 12, 31)).period === 35);
+  const south = seasonAndPeriod(day(2019, 1, 15), 7);
+  check('Southern season starting in July: 15 Jan 2019 belongs to season 2018, period 19', south.season === 2018 && south.period === 19);
+  check('Period 19 of season 2018 (start July) begins on 11 Jan 2019', periodStart(2018, 19, 7).getTime() === day(2019, 1, 11).getTime());
+
+  /* ---------- Made-up field ----------
+     Five normal years. In period p the values are 0.50, 0.52, 0.54, 0.56, 0.58:
+     average 0.54, standard deviation 0.0316. The test year is changed in a few
+     periods to known anomalies. */
+  const normalValues = [0.50, 0.52, 0.54, 0.56, 0.58];
+  const mean = 0.54;
+  const sd = Math.sqrt(normalValues.reduce((s, v) => s + (v - mean) ** 2, 0) / 4); // 0.0316
+  const rows = [];
+  const seasonShape = (p) => (p >= 12 && p <= 26 ? 0.35 : 0); // high in the middle = growing season
+  normalValues.forEach((v, i) => {
+    for (let p = 0; p < 36; p++) {
+      const date = periodStart(2010 + i, p);
+      date.setUTCDate(date.getUTCDate() + 4);
+      rows.push({ date, ndvi: v + seasonShape(p), ndmi: v + seasonShape(p) });
+    }
+  });
+  // Test year 2020: normal, except NDMI in periods 15..18 and NDVI in period 18..19.
+  const zTarget = { 15: -1.5, 16: -2.5, 17: -2.5, 18: -3, 19: 0 };
+  const ndviTarget = { 18: -2.5, 19: -2.5 };
+  for (let p = 0; p < 36; p++) {
+    const date = periodStart(2020, p);
+    date.setUTCDate(date.getUTCDate() + 4);
+    const base = mean + seasonShape(p);
+    rows.push({ date, ndvi: base + (ndviTarget[p] ?? 0) * sd, ndmi: base + (zTarget[p] ?? 0) * sd });
+  }
+  const field = { id: 'test', season: 2020, normalYears: [2010, 2011, 2012, 2013, 2014] };
+  const a = analyseField(field, rows);
+
+  check('Uses the 5 normal years', a.normalYears.length === 5);
+  check('Average of the normal years is 0.54 (+ season shape)', close(a.ndmi.mean[5], 0.54));
+  check('Standard deviation is 0.0316', close(a.ndmi.sd[5], sd), `got ${a.ndmi.sd[5]}`);
+  check('z-score is computed correctly (−1.5)', close(a.ndmi.z[15], -1.5, 1e-9), `got ${a.ndmi.z[15]}`);
+  check('Growing season found from the field’s own data (period 15 in, period 2 out)', a.inSeason[15] && !a.inSeason[2]);
+  check('Normal value (z = 0) is green', a.ndmi.level[14] === 'green');
+  check('z = −1.5 is yellow', a.ndmi.level[15] === 'yellow');
+  check('z = −2.5 ONCE is only yellow (red needs 2 periods in a row)', a.ndmi.level[16] === 'yellow');
+  check('z = −2.5 for the 2nd period in a row is red', a.ndmi.level[17] === 'red');
+  check('Overall level = the worse of NDVI and NDMI', a.overall[17] === 'red' && a.ndvi.level[17] === 'green');
+  check('Outside the growing season the overall level is "off"', a.overall[2] === 'off');
+  check('Warning since: the run started in period 15', warningSince(a, 17) === 15);
+  check('No "warning since" on a green period', warningSince(a, 14) === null);
+  const lead = leadTime(a, 35);
+  check('Lead time: NDMI warned 40 days before NDVI went red (5 June → 15 July)', lead && lead.ndmiStart === 15 && lead.ndviRed === 19 && lead.days === 40,
+    lead ? `NDMI from period ${lead.ndmiStart}, NDVI red in period ${lead.ndviRed}, ${lead.days} days` : 'none');
+  check('Replay uses no future data: lead time is unknown before NDVI turned red', leadTime(a, 18) === null);
+
+  /* ---------- Red needs consecutive pictures ---------- */
+  // Remove the picture of period 17: period 16 (−2.5) and 18 (−3) are then separated by one cloudy period.
+  const gapRows = rows.filter((r) => !(r.date.getUTCFullYear() === 2020 && seasonAndPeriod(r.date).period === 17));
+  const b = analyseField(field, gapRows);
+  check('One cloudy period in between still counts as "in a row"', b.ndmi.level[18] === 'red');
+  const gap2 = gapRows.filter((r) => !(r.date.getUTCFullYear() === 2020 && seasonAndPeriod(r.date).period === 16));
+  check('Two cloudy periods in between do NOT count as "in a row"', analyseField(field, gap2).ndmi.level[18] === 'yellow');
+
+  /* ---------- SD floor ---------- */
+  const flatRows = [];
+  for (let y = 2010; y < 2015; y++) for (let p = 0; p < 36; p++) {
+    const date = periodStart(y, p); date.setUTCDate(date.getUTCDate() + 4);
+    flatRows.push({ date, ndvi: 0.5 + seasonShape(p), ndmi: 0.3 });
+  }
+  const date = periodStart(2020, 15); date.setUTCDate(date.getUTCDate() + 4);
+  flatRows.push({ date, ndvi: 0.85, ndmi: 0.29 });
+  const c = analyseField(field, flatRows);
+  check(`SD is never below ${SD_FLOOR} (identical normal years)`, close(c.ndmi.sd[15], SD_FLOOR));
+  check('So a tiny difference (−0.01) is NOT a warning', c.ndmi.level[15] === 'green', `z = ${c.ndmi.z[15]}`);
+
+  /* ---------- Not enough normal years ---------- */
+  const d = analyseField({ ...field, normalYears: [2010, 2011] }, rows);
+  check('With only 2 normal years there is no judgement ("unknown")', d.overall[15] === 'unknown');
+
+  /* ---------- CSV reader ---------- */
+  const csv = 'system:index,date,year,NDVI,NDMI,.geo\n'
+    + '0,2018-05-03,2018,0.81,0.33,"{""type"":""Point"",""coordinates"":[10.5,52.9]}"\n'
+    + '1,2018-04-01T10:31:00,2018,0.62,,"x"\n'
+    + '2,not a date,2018,0.5,0.2,"x"\n';
+  const parsed = parseCsv(csv);
+  check('CSV: reads Earth Engine files with extra and quoted columns', parsed.length === 2);
+  check('CSV: sorts by date and reads values', parsed[0].ndvi === 0.62 && parsed[1].ndmi === 0.33);
+  check('CSV: an empty value becomes "no value" (not 0)', parsed[0].ndmi === null);
+
+  /* ---------- Distance ---------- */
+  check('Distance Berlin–Munich is about 504 km', Math.abs(distanceKm(52.52, 13.405, 48.137, 11.575) - 504) < 5);
+
+  /* ---------- Show results ---------- */
+  const passed = results.filter((r) => r.ok).length;
+  document.getElementById('summary').textContent = `${passed} of ${results.length} tests passed`;
+  document.getElementById('summary').style.color = passed === results.length ? 'var(--ok)' : 'var(--bad)';
+  document.getElementById('results').innerHTML = results
+    .map((r) => `<li class="${r.ok ? 'ok' : 'bad'}">${r.name}${r.detail ? ` <small>(${r.detail})</small>` : ''}</li>`)
+    .join('');
+  window.testResults = { passed, total: results.length };
+</script>
+</body>
+</html>

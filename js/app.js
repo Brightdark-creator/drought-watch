@@ -7,7 +7,8 @@
  *   i18n.js / lang.js  all texts, dates and numbers
  */
 import * as Data from './data.js';
-import { analyseField, warningSince, SYMBOLS } from './analysis.js';
+import { analyseField, warningSince, leadTime, SYMBOLS } from './analysis.js';
+import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
   t, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
   formatDate, formatShortDate, formatNumber, formatSigned, formatKm, formatHectares, formatList,
@@ -67,6 +68,7 @@ async function init() {
     return;
   }
   renderChips();
+  if (!navigator.onLine) showMessage(t('offline'));
   if (!state.light) await startMap();
 
   // Analyse every field in the background so pins and buttons show their light.
@@ -172,9 +174,11 @@ async function onSearch(event) {
 function renderSelected(a) {
   $('details').hidden = false;
   renderSlider(a);
+  renderTimeline(a);
   renderCompare(a);
   renderCard();
   renderCharts(a);
+  renderTable(a);
 }
 
 async function rerender() {
@@ -189,9 +193,9 @@ async function renderCard({ loading = false } = {}) {
   const card = $('card');
   const field = currentField();
   if (!field || loading) {
-    card.className = 'card';
+    card.className = `card${loading ? ' loading' : ''}`;
     card.innerHTML = `
-      <div class="badge" aria-hidden="true">${loading ? '…' : '?'}</div>
+      <div class="card-visual">${plantSvg(loading ? 'off' : 'green')}</div>
       <div class="card-body">
         <h2 class="level">${esc(loading ? t('loading') : t('chooseTitle'))}</h2>
         ${loading ? '' : `<p class="advice">${esc(t('chooseText'))}</p>`}
@@ -201,39 +205,85 @@ async function renderCard({ loading = false } = {}) {
   const a = await analysisFor(field);
   const p = state.period;
   const level = p == null ? 'unknown' : a.overall[p] || 'unknown';
+  const inSeason = p != null && a.inSeason[p];
 
-  // One line per index: symbol, name, word, and the anomaly in standard deviations.
-  const indexLine = (key) => {
+  // One meter per index: how many standard deviations from normal.
+  const meter = (key) => {
     const lv = p == null ? null : a[key].level[p];
     const z = p == null ? null : a[key].z[p];
-    const inSeason = p != null && a.inSeason[p];
     const symbolLevel = inSeason && lv ? lv : 'off'; // outside the season: no judgement
-    const word = lv == null ? t('idx_none') : inSeason ? t(`idx_${lv}`) : '';
-    const zText = z == null ? '' : ` <span class="z" title="${esc(t('sdExplain'))}">(${esc(t('sdValue', { z: formatSigned(z) }))})</span>`;
-    return `<li><span class="mini lvl-${symbolLevel}" aria-hidden="true">${SYMBOLS[symbolLevel]}</span>`
-      + `<span><b>${esc(t(`${key}Name`))}:</b> ${esc(word)}${zText}</span></li>`;
+    const word = lv == null ? t('idx_none') : inSeason ? t(`idx_${lv}`) : t('idx_off');
+    const zText = z == null ? '' : t('sdValue', { z: formatSigned(z) });
+    const head = `<span class="mini lvl-${symbolLevel}" aria-hidden="true">${SYMBOLS[symbolLevel]}</span>`
+      + `<b>${esc(t(`${key}Name`))}</b><span class="word">${esc(word)}</span>`
+      + (zText ? `<span class="z" title="${esc(t('sdExplain'))}">${esc(zText)}</span>` : '');
+    return meterHtml({
+      z, level: lv, inSeason, head,
+      ariaLabel: esc(t('meterAria', { name: t(`${key}Name`), z: z == null ? '–' : formatSigned(z), word })),
+      formatTick: (v) => (v === 0 ? esc(t('idx_green')) : esc(t('sdValue', { z: formatSigned(v, 0) }))),
+    });
   };
 
   const since = p == null ? null : warningSince(a, p);
+  const lead = p == null ? null : leadTime(a, p);
+  const crop = t(`crop_${field.crop}`);
   const meta = [
-    `${esc(pick(field.name))}`,
-    `${esc(t(`crop_${field.crop}`) || t('crop_unknown'))}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
+    `<b>${esc(pick(field.name))}</b>`,
+    `${esc(crop.startsWith('crop_') ? t('crop_unknown') : crop)}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
   ];
+  const facts = [
+    p != null && a.dates[p] ? t('imageDate', { date: formatDate(a.dates[p]) }) : null,
+    since != null && since !== p ? t('warningSince', { date: formatDate(a.dates[since]) }) : null,
+    t('comparedWith', { years: formatList(a.normalYears) }),
+  ].filter(Boolean);
 
   card.className = `card ${level}`;
   card.innerHTML = `
-    <div class="badge" aria-hidden="true">${SYMBOLS[level]}</div>
+    <p class="field-name">${meta.join(' · ')}</p>
+    <div class="card-visual">
+      ${plantSvg(level)}
+      <span class="badge" aria-hidden="true">${SYMBOLS[level]}</span>
+    </div>
     <div class="card-body">
-      <p class="field-name">${meta.join('<br>')}</p>
       <h2 class="level">${esc(t(`level_${level}`))}</h2>
       <p class="advice">${esc(t(`advice_${level}`))}</p>
-      <ul class="indices">${indexLine('ndmi')}${indexLine('ndvi')}</ul>
-      <p class="meta">
-        ${p != null && a.dates[p] ? esc(t('imageDate', { date: formatDate(a.dates[p]) })) + '<br>' : ''}
-        ${esc(t('comparedWith', { years: formatList(a.normalYears) }))}
-        ${since != null && since !== p ? '<br>' + esc(t('warningSince', { date: formatDate(a.dates[since]) })) : ''}
-      </p>
-    </div>`;
+    </div>
+    <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
+    ${lead ? `<p class="lead"><span class="lead-days">${esc(t('leadDays', { days: lead.days }))}</span>${esc(t('leadTime', { days: lead.days }))}</p>` : ''}
+    <p class="meta">${facts.map(esc).join(' · ')}</p>`;
+}
+
+/** The season at a glance: one bar per 10-day period (click a bar to jump there). */
+function renderTimeline(a) {
+  const narrow = window.matchMedia('(max-width: 560px)').matches;
+  $('timeline').innerHTML = timelineHtml(a, state.period, (d) => formatDate(d, { month: narrow ? 'narrow' : 'short' }));
+}
+
+/** The same numbers as the charts, as a table (for screen readers and for checking). */
+function renderTable(a) {
+  const fmt = (v) => (v == null ? '–' : formatNumber(v, 2));
+  const fmtNormal = (s, p) => (s.mean[p] == null ? '–' : `${formatNumber(s.mean[p], 2)} ± ${formatNumber(s.sd[p], 2)}`);
+  const fmtZ = (z) => (z == null ? '–' : formatSigned(z));
+  const rows = a.dataPeriods.filter((p) => p <= state.period).map((p) => {
+    const level = a.overall[p];
+    return `<tr${p === state.period ? ' class="current"' : ''}>
+      <th scope="row">${esc(formatDate(a.dates[p], { day: 'numeric', month: 'short' }))}</th>
+      <td>${fmt(a.ndmi.values[p])}</td><td>${fmtNormal(a.ndmi, p)}</td><td>${fmtZ(a.ndmi.z[p])}</td>
+      <td>${fmt(a.ndvi.values[p])}</td><td>${fmtNormal(a.ndvi, p)}</td><td>${fmtZ(a.ndvi.z[p])}</td>
+      <td><span class="mini lvl-${level}" aria-hidden="true">${SYMBOLS[level]}</span> ${esc(t(`level_${level}`))}</td>
+    </tr>`;
+  }).join('');
+  $('table-wrap').innerHTML = `<table>
+    <thead>
+      <tr><th rowspan="2" scope="col">${esc(t('tableDate'))}</th>
+        <th colspan="3" scope="colgroup">${esc(t('ndmiName'))}</th>
+        <th colspan="3" scope="colgroup">${esc(t('ndviName'))}</th>
+        <th rowspan="2" scope="col">${esc(t('tableLevel'))}</th></tr>
+      <tr><th scope="col">${esc(t('tableValue'))}</th><th scope="col">${esc(t('tableNormal'))}</th><th scope="col">${esc(t('tableZ'))}</th>
+        <th scope="col">${esc(t('tableValue'))}</th><th scope="col">${esc(t('tableNormal'))}</th><th scope="col">${esc(t('tableZ'))}</th></tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 /** Slider over the periods that have a satellite picture. */
@@ -279,6 +329,7 @@ function renderCharts(a) {
         ? { label: t('legendCompare', { year: state.compareYear }), values: a.normals[state.compareYear][key] }
         : null,
       selected: state.period,
+      inSeason: a.inSeason,
       texts: { season: t('legendSeason', { year: a.season }), mean: t('legendMean'), band: t('legendBand') },
       locale: locale(),
       format: (v, digits = 2) => formatNumber(v, digits),
@@ -330,7 +381,7 @@ async function startMap() {
     await MapView.initMap($('map'), {
       onFieldClick: (id) => selectField(id),
       onMapClick: (lat, lon) => chooseLocation(lat, lon),
-    });
+    }, layerLabels());
   } catch (error) {
     console.error(error);
     showMessage(t('mapError'));
@@ -345,12 +396,30 @@ async function startMap() {
   if (field) MapView.focusField(field);
 }
 
+const layerLabels = () => ({ satellite: t('layerSatellite'), map: t('layerMap') });
+
 async function setLightMode(on, { save = true } = {}) {
   state.light = on;
   if (save) writePref('dw.light', on ? '1' : '0');
   renderLightToggle();
   if (on) MapView.destroyMap();
   else if (state.fields.length) await startMap();
+}
+
+/* ---------- "Use my location" ---------- */
+function onLocate() {
+  if (!navigator.geolocation) { showMessage(t('locateError')); return; }
+  showMessage(t('locating'));
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      hideMessage();
+      const { latitude, longitude } = pos.coords;
+      MapView.flyTo(latitude, longitude, 12);
+      chooseLocation(latitude, longitude);
+    },
+    () => showMessage(t('locateError')),
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
+  );
 }
 
 /* ---------- Messages ---------- */
@@ -385,9 +454,26 @@ function wireControls() {
     setLanguage(e.target.value);
     writePref('dw.lang', getLanguage());
     applyStaticTexts();
+    MapView.setLayerLabels(layerLabels());
     renderChips();
     rerender();
   });
+  $('locate').addEventListener('click', onLocate);
+  // Click a bar of the season timeline to jump to that date.
+  $('timeline').addEventListener('click', async (e) => {
+    const bar = e.target.closest('.bar');
+    const field = currentField();
+    if (!bar || !field) return;
+    const a = await analysisFor(field);
+    const wanted = Number(bar.dataset.p);
+    // Bars without a picture jump to the nearest period that has one.
+    state.period = a.dataPeriods.reduce((best, q) => (Math.abs(q - wanted) < Math.abs(best - wanted) ? q : best));
+    renderSelected(a);
+  });
+  window.addEventListener('offline', () => showMessage(t('offline')));
+  window.addEventListener('online', hideMessage);
+  // Redraw the timeline month labels when the screen gets narrower or wider.
+  window.matchMedia('(max-width: 560px)').addEventListener('change', rerender);
   $('chips').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (chip) selectField(chip.dataset.id);
@@ -404,3 +490,9 @@ function wireControls() {
 }
 
 init();
+
+// Offline support: sw.js keeps a copy of the app and data on the device.
+// Service workers only run on https:// or localhost (GitHub Pages is https).
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+  navigator.serviceWorker.register('sw.js').catch((error) => console.warn('Offline mode not available:', error));
+}

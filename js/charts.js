@@ -17,6 +17,7 @@ const COLORS = {
   compare: '#2563eb',
   grid: 'rgba(0, 0, 0, 0.07)',
   selected: '#1f6f50',
+  offSeason: 'rgba(28, 35, 33, 0.045)',
 };
 
 export const LEVEL_COLORS = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828', off: '#a3aca8', unknown: '#a3aca8' };
@@ -27,6 +28,21 @@ const POINT_RADIUS = { green: 4, yellow: 6, red: 7, off: 3, unknown: 3 };
 /** Small Chart.js plugin: vertical line at the selected period. */
 const selectedLine = {
   id: 'selectedLine',
+  // Before the lines are drawn: shade the periods outside the growing season.
+  beforeDatasetsDraw(chart, _args, options) {
+    const inSeasonList = options.inSeason;
+    if (!inSeasonList) return;
+    const { top, bottom } = chart.chartArea;
+    const x = chart.scales.x;
+    const half = (x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.fillStyle = COLORS.offSeason;
+    inSeasonList.forEach((inSeason, i) => {
+      if (!inSeason) ctx.fillRect(x.getPixelForValue(i) - half, top, half * 2 + 0.5, bottom - top);
+    });
+    ctx.restore();
+  },
   afterDatasetsDraw(chart, _args, options) {
     if (options.index == null) return;
     const x = chart.scales.x.getPixelForValue(options.index);
@@ -125,7 +141,7 @@ export class IndexChart {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false }, // the page shows its own legend
-        selectedLine: { index: d.selected },
+        selectedLine: { index: d.selected, inSeason: d.inSeason },
         tooltip: {
           filter: (item) => !item.dataset.hideInTooltip && item.parsed.y != null,
           callbacks: {

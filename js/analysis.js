@@ -157,6 +157,8 @@ function indexLevel(z, p) {
 function overallLevel(result, p) {
   const hasPicture = INDICES.some((k) => result[k].values[p] != null);
   if (!hasPicture) return null;
+  // No normal values to compare with (too few normal years): say so honestly.
+  if (INDICES.every((k) => result[k].mean[p] == null)) return 'unknown';
   if (!result.inSeason[p]) return 'off';
   const levels = INDICES.map((k) => result[k].level[p]).filter(Boolean);
   if (levels.length === 0) return 'unknown';
@@ -254,6 +256,33 @@ function mostTypicalYear(result) {
     if (n > 0 && sum / n < bestError) { bestError = sum / n; best = y; }
   }
   return best;
+}
+
+/**
+ * Early-warning lead time — the main result for the science fair.
+ * Leaves lose water before they lose colour. So: when greenness (NDVI) first
+ * fell far below normal (red), how many days earlier had leaf water (NDMI)
+ * already been below normal without a break? Uses only pictures up to `upTo`.
+ * Returns { ndmiStart, ndviRed, days } or null.
+ */
+export function leadTime(result, upTo) {
+  const periods = result.dataPeriods.filter((p) => p <= upTo && result.inSeason[p]);
+  const ndviRed = periods.find((p) => result.ndvi.level[p] === 'red');
+  if (ndviRed == null) return null;
+  const before = periods.filter((q) => q <= ndviRed).reverse(); // newest first
+  const ndmiLow = (q) => result.ndmi.z[q] != null && result.ndmi.z[q] < YELLOW_Z;
+  // The last NDMI warning at or before the NDVI red (leaf water may already
+  // have started to recover by then), then back to the start of that run.
+  const last = before.findIndex(ndmiLow);
+  if (last < 0) return null;
+  let start = before[last];
+  for (const q of before.slice(last + 1)) {
+    if (!ndmiLow(q)) break;
+    start = q;
+  }
+  if (start === ndviRed) return null;
+  const days = Math.round((result.dates[ndviRed] - result.dates[start]) / 86400000);
+  return { ndmiStart: start, ndviRed, days };
 }
 
 /**
