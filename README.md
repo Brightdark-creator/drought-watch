@@ -101,7 +101,8 @@ The results page shows them in the column "Two spots nearby".
 - Italy: only yellow ("watch") at both nearby spots, so the red at the main
   spot is weaker evidence than it looks; the drought signal there varies a lot
   from field to field (irrigation is common in the Po Valley).
-- USA: no red nearby either, which agrees with "no damage".
+- USA: no red nearby either (one "watch", one "healthy"), which agrees with "no damage".
+- In total 10 of 12 nearby spots give the same answer (red or not) as the main spot; the 2 that differ are both in Italy.
 
 **Where the normal years come from:** known drought history, checked with
 sources: Germany was also dry in 2019, 2020 and 2022 (one multi-year drought
