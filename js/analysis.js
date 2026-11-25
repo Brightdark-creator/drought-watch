@@ -276,19 +276,24 @@ function mostTypicalYear(result) {
 /* ---------- Are the "normal" years really normal? ---------- */
 
 /**
- * A normal year is flagged when its typical anomaly is below −2 SD for BOTH
- * leaf water and greenness (a real drought lowers both). With only ~5 normal
- * years one year often looks a bit low just by chance, so the limit is strict
- * and the result is a hint to check that year, not a verdict.
+ * A normal year is flagged when the lower quarter of its anomalies (25th
+ * percentile over the growing season) is below −3 SD for one index AND below
+ * −2 SD for the other (a real drought lowers leaf water and greenness).
+ * Why the lower quarter and not the median: a drought often hits only part of
+ * the season (e.g. May–July), which hardly moves the median.
+ * The limits were chosen with the simulated sample fields (every built-in
+ * drought year is caught); check them again with real data. With only ~5
+ * normal years one year can look low by chance, so this is a hint, not a verdict.
  */
-export const SUSPICIOUS_YEAR_Z = -2;
+export const SUSPICIOUS_YEAR_Z = -3;
+export const SUSPICIOUS_OTHER_Z = -2;
 
 /**
  * If one of the "normal" years was secretly a drought year, the normal range
  * is too low and warnings come too late. So each normal year is compared with
- * the OTHER normal years only ("leave one out"): its median z-score over the
- * growing season. Below −2 for both indices means it looks dry itself (or a
- * different crop was grown that year). Needs at least 4 normal years.
+ * the OTHER normal years only ("leave one out"): the lower quarter (25th
+ * percentile) of its z-scores over the growing season, for each index.
+ * Needs at least 4 normal years.
  * Returns [{ year, ndmi, ndvi, suspicious }].
  */
 export function checkNormalYears(result) {
@@ -296,7 +301,7 @@ export function checkNormalYears(result) {
   if (years.length < MIN_NORMAL_YEARS + 1) return [];
   return years.map((year) => {
     const others = years.filter((y) => y !== year);
-    const medianZ = (key) => {
+    const lowerQuarterZ = (key) => {
       const zs = [];
       for (let p = 0; p < PERIODS; p++) {
         if (!result.inSeason[p]) continue;
@@ -308,12 +313,12 @@ export function checkNormalYears(result) {
       }
       if (!zs.length) return null;
       zs.sort((a, b) => a - b);
-      const mid = Math.floor(zs.length / 2);
-      return zs.length % 2 ? zs[mid] : (zs[mid - 1] + zs[mid]) / 2;
+      return zs[Math.floor(0.25 * (zs.length - 1))]; // 25 % of the values are lower than this
     };
-    const ndmi = medianZ('ndmi');
-    const ndvi = medianZ('ndvi');
-    const suspicious = ndmi != null && ndvi != null && ndmi < SUSPICIOUS_YEAR_Z && ndvi < SUSPICIOUS_YEAR_Z;
+    const ndmi = lowerQuarterZ('ndmi');
+    const ndvi = lowerQuarterZ('ndvi');
+    const suspicious = ndmi != null && ndvi != null
+      && Math.min(ndmi, ndvi) < SUSPICIOUS_YEAR_Z && Math.max(ndmi, ndvi) < SUSPICIOUS_OTHER_Z;
     return { year, ndmi, ndvi, suspicious };
   });
 }

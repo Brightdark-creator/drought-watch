@@ -77,6 +77,10 @@
         <legend data-i18n="normalYearsLabel"></legend>
         <div id="up-normals" class="year-boxes"></div>
       </fieldset>
+      <label class="check keep-check">
+        <input id="up-keep" type="checkbox">
+        <span data-i18n="keepUpload"></span>
+      </label>
       <div class="upload-actions">
         <span class="hint" data-i18n="uploadPrivacy"></span>
         <button id="up-remove" type="button" class="toggle" data-i18n="removeUpload"></button>
@@ -120,6 +124,17 @@
         <div id="table-wrap" class="table-wrap" tabindex="0" role="region" data-i18n-aria-label="tableShow"></div>
       </details>
     </section>
+
+    <details class="explain">
+      <summary data-i18n="exportTitle"></summary>
+      <ol class="steps">
+        <li data-i18n="export1"></li>
+        <li data-i18n="export2"></li>
+        <li data-i18n="export3"></li>
+        <li data-i18n="export4"></li>
+      </ol>
+      <p><a href="tools/earth-engine-export.js" download data-i18n="exportScript"></a></p>
+    </details>
 
     <details class="explain">
       <summary data-i18n="howTitle"></summary>

@@ -63,6 +63,7 @@ async function init() {
 
   try {
     state.fields = await Data.listFields();
+    state.fields.push(...Data.restoreKeptUploads()); // files the user chose to keep
   } catch (error) {
     console.error(error);
     showMessage(t('loadError'));
@@ -479,6 +480,7 @@ async function renderUploadSettings(a) {
   const panel = $('upload-settings');
   panel.hidden = !field?.uploaded;
   if (!field?.uploaded) return;
+  $('up-keep').checked = Data.isUploadKept(field.id);
   const start = field.seasonStartMonth || 1;
   $('up-start').innerHTML = Array.from({ length: 12 }, (_, i) => i + 1)
     .map((m) => `<option value="${m}"${m === start ? ' selected' : ''}>${esc(formatDate(new Date(Date.UTC(2000, m - 1, 1)), { month: 'long' }))}</option>`)
@@ -506,6 +508,7 @@ function changeUploadSettings(change) {
   const field = currentField();
   if (!field?.uploaded) return;
   Object.assign(field, change);
+  if (Data.isUploadKept(field.id)) Data.keepUpload(field); // save the new settings too
   state.analyses.delete(field.id);
   selectField(field.id).then(() => analysisFor(field).then((a) => updateFieldLevel(field.id, a)));
 }
@@ -607,6 +610,12 @@ function wireControls() {
     normalYears: [...$('up-normals').querySelectorAll('input:checked')].map((i) => Number(i.value)),
   }));
   $('up-remove').addEventListener('click', removeUpload);
+  $('up-keep').addEventListener('change', (e) => {
+    const field = currentField();
+    if (!field?.uploaded) return;
+    if (!e.target.checked) Data.forgetUpload(field.id);
+    else if (!Data.keepUpload(field)) { e.target.checked = false; showMessage(t('keepFailed')); }
+  });
   // Click a bar of the season timeline to jump to that date.
   $('timeline').addEventListener('click', async (e) => {
     const bar = e.target.closest('.bar');

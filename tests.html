@@ -28,7 +28,7 @@
 </main>
 <script type="module">
   import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, SD_FLOOR } from './js/analysis.js';
-  import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError } from './js/data.js';
+  import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError, keepUpload, restoreKeptUploads, isUploadKept, forgetUpload, loadSeries } from './js/data.js';
 
   const results = [];
   function check(name, condition, detail = '') {
@@ -146,6 +146,11 @@
   check('…and does not flag the other normal years', dry.filter((c) => c.suspicious).length === 1);
   const fine = checkNormalYears(analyseField(field, makeYears(-0.02)));
   check('A year only a little lower (−0.02) is not flagged', fine.every((c) => !c.suspicious));
+  // A drought in only the second half of the growing season (periods 20–26 of 12–26):
+  // the median hardly moves, the lower quarter does.
+  const halfDry = makeYears(0).map((r) => (r.date.getUTCFullYear() === 2012 && seasonAndPeriod(r.date).period >= 20 && seasonAndPeriod(r.date).period <= 26
+    ? { ...r, ndvi: r.ndvi - 0.12, ndmi: r.ndmi - 0.12 } : r));
+  check('A drought in only part of the season is still flagged', checkNormalYears(analyseField(field, halfDry)).find((c) => c.year === 2012)?.suspicious === true);
 
   /* ---------- Confidence ---------- */
   check('Confidence high: 5 normal years, previous picture 10 days earlier, clear result', confidence(a, 15)?.level === 'high');
@@ -190,6 +195,20 @@
   const csvText = 'date,NDVI,NDMI\n' + rows.map((r) => `${r.date.toISOString().slice(0, 10)},${r.ndvi},${r.ndmi}`).join('\n');
   const up = await readUploadedFile(new File([csvText], 'my field.csv'));
   check('A good upload becomes a field named after the file, with all its pictures', up.field.uploaded && up.field.name.en === 'my field' && up.rows.length === rows.length);
+  // Keep on this device and restore (the test removes its own entry afterwards).
+  let savedBefore = null;
+  try { savedBefore = localStorage.getItem('dw.uploads'); } catch { /* private window */ }
+  up.field.season = 2020;
+  up.field.normalYears = [2010, 2011, 2012];
+  const keptOk = keepUpload(up.field);
+  const restored = restoreKeptUploads().find((f) => f.id === up.field.id);
+  const restoredRows = restored ? await loadSeries(restored) : [];
+  check('Keep + restore: the file and its settings come back after a reload', keptOk && isUploadKept(up.field.id)
+    && restored?.season === 2020 && restored.normalYears.length === 3 && restoredRows.length === rows.length
+    && Math.abs(restoredRows[5].ndvi - up.rows[5].ndvi) < 1e-12);
+  forgetUpload(up.field.id);
+  check('Forget: the kept file is removed again', !isUploadKept(up.field.id));
+  try { if (savedBefore == null) localStorage.removeItem('dw.uploads'); else localStorage.setItem('dw.uploads', savedBefore); } catch { /* ignore */ }
 
   /* ---------- Distance ---------- */
   check('Distance Berlin–Munich is about 504 km', Math.abs(distanceKm(52.52, 13.405, 48.137, 11.575) - 504) < 5);

@@ -47,6 +47,8 @@ export class DataError extends Error {
 
 const uploads = new Map(); // field id -> rows (kept in memory only, never sent anywhere)
 let uploadCount = 0;
+// A unique id, also across page reloads (kept files keep their id).
+const newUploadId = () => `upload-${Date.now().toString(36)}-${++uploadCount}`;
 
 /** A file needs at least this many pictures: several years of a few pictures each. */
 export const MIN_UPLOAD_ROWS = 30;
@@ -69,7 +71,7 @@ export async function readUploadedFile(file) {
   if (rows.length < MIN_UPLOAD_ROWS) throw new DataError('tooFew', { n: rows.length });
   const name = file.name.replace(/\.(csv|json)$/i, '');
   const field = {
-    id: `upload-${++uploadCount}`,
+    id: newUploadId(),
     uploaded: true,
     name: { en: name },
     short: { en: name },
@@ -82,6 +84,55 @@ export async function readUploadedFile(file) {
 export function removeUploadedField(id) {
   uploads.delete(id);
   seriesCache.delete(id);
+  forgetUpload(id);
+}
+
+/* ---------- Keeping uploaded files on this device (only if the user ticks it) ---------- */
+
+const KEPT_KEY = 'dw.uploads';
+// The settings of a field that are worth keeping (not the map pin or the rows).
+const KEPT_PROPS = ['id', 'uploaded', 'name', 'short', 'lat', 'lon', 'polygon', 'season', 'seasonStartMonth', 'normalYears'];
+
+function readKept() {
+  try { return JSON.parse(localStorage.getItem(KEPT_KEY) || '[]'); } catch { return []; }
+}
+
+/** Is this uploaded field kept on the device? */
+export function isUploadKept(id) {
+  return readKept().some((k) => k.field.id === id);
+}
+
+/**
+ * Save an uploaded field and its pictures in this browser's storage
+ * (localStorage, about 25 KB per field). Returns false if the browser
+ * refuses (private window, storage full).
+ */
+export function keepUpload(field) {
+  const rows = uploads.get(field.id);
+  if (!rows) return false;
+  const kept = readKept().filter((k) => k.field.id !== field.id);
+  const slim = Object.fromEntries(KEPT_PROPS.filter((p) => field[p] !== undefined).map((p) => [p, field[p]]));
+  // Compact rows: [date, NDVI, NDMI]
+  kept.push({ field: slim, rows: rows.map((r) => [r.date.toISOString().slice(0, 10), r.ndvi, r.ndmi]) });
+  try {
+    localStorage.setItem(KEPT_KEY, JSON.stringify(kept));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function forgetUpload(id) {
+  const kept = readKept().filter((k) => k.field.id !== id);
+  try { localStorage.setItem(KEPT_KEY, JSON.stringify(kept)); } catch { /* nothing to do */ }
+}
+
+/** Load the kept uploads (after a reload, or on the results page). Returns their fields. */
+export function restoreKeptUploads() {
+  return readKept().map(({ field, rows }) => {
+    uploads.set(field.id, clean(rows.map(([date, ndvi, ndmi]) => makeRow(date, ndvi, ndmi))));
+    return field;
+  });
 }
 
 /**

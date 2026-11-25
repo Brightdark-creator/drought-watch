@@ -21,7 +21,8 @@ async function init() {
   document.title = t('summaryTitle');
   $('print').addEventListener('click', () => window.print());
 
-  const fields = await Data.listFields();
+  // Test fields plus any uploaded files the user chose to keep on this device.
+  const fields = [...(await Data.listFields()), ...Data.restoreKeptUploads()];
   const results = await Promise.all(fields.map(async (field) => {
     const a = analyseField(field, await Data.loadSeries(field));
     return { field, a, s: seasonSummary(a) };
@@ -59,7 +60,7 @@ async function init() {
   $('fields').innerHTML = results.map(({ field, a, s }) => `
     <article class="field-card">
       <h3><span class="mini lvl-${s.worst}" aria-hidden="true">${SYMBOLS[s.worst]}</span> ${esc(pick(field.name))}</h3>
-      <p class="meta">${esc(t(`crop_${field.crop}`))} · ${esc(t('season'))} ${a.season} · ${esc(t('comparedWith', { years: formatList(a.normalYears) }))}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}</p>
+      <p class="meta">${esc(field.uploaded ? t('fromYourFile') : t(`crop_${field.crop}`))} · ${esc(t('season'))} ${a.season} · ${esc(t('comparedWith', { years: formatList(a.normalYears) }))}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}</p>
       <div class="timeline">${timelineHtml(a, null, monthLabel)}</div>
       <p>${s.lead
         ? esc(t('summaryLead', { ndmiDate: formatDate(a.dates[s.lead.ndmiStart]), ndviDate: formatDate(a.dates[s.lead.ndviRed]), days: s.lead.days }))

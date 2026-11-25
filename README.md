@@ -38,7 +38,8 @@ drought-watch/
 │   ├── it-mantova.csv
 │   └── us-illinois.csv
 └── tools/
-    └── make_sample_data.py makes the simulated sample CSVs
+    ├── make_sample_data.py     makes the simulated sample CSVs
+    └── earth-engine-export.js  Earth Engine Code Editor script that exports a CSV for one field
 ```
 
 ## How the warning works
@@ -101,14 +102,22 @@ periods, plus each field's season timeline. The Print button gives a clean
 handout.
 
 It also runs a **normal-year check**: each normal year is compared with the
-other normal years only (leave-one-out). If its median anomaly over the
-growing season is below −2 SD for both leaf water and greenness, the year is
-marked "check": it may have been a drought year itself (which would make
-"normal" too dry and warnings too late) or a different crop was grown. Look it
-up in weather records and remove it from `normalYears` if it was dry. With
-only ~5 normal years one year can look low by chance, so this is a hint, not a
-verdict. (In the simulated Uelzen data, 2017 is flagged: by chance its random
-peak came out about 0.05 lower than the other years.)
+other normal years only (leave-one-out). The app takes the lower quarter
+(25th percentile) of its anomalies over the growing season; below −3 SD for
+one index and below −2 SD for the other, the year is marked "check": it may
+have been a drought year itself (which would make "normal" too dry and
+warnings too late) or a different crop was grown. Look it up in weather
+records and remove it from `normalYears` if it was dry. The same check marks
+years as "looks dry" in the settings for an uploaded file.
+
+Why the lower quarter and not the median: a drought often hits only part of
+the season (Uelzen 2018: May–July), which hardly moves the median. Tested on
+the simulated fields with every possible season choice: the median caught
+only some of the built-in drought years; the lower-quarter rule caught all 15
+cases where a drought year was among the "normal" years, and gave 2 false
+flags in 60 checks of truly normal years (both Uelzen 2017, whose random peak
+came out about 0.05 lower). The limits were chosen on simulated data, so
+check them with real data. With ~5 normal years it is a hint, not a verdict.
 
 ## Tests
 
@@ -117,8 +126,8 @@ the calendar, the average/SD/z-score, every part of the warning rule (yellow,
 red only twice in a row, cloudy gaps, SD minimum, too few normal years), the
 lead time, the season summary, the confidence label, the CSV reader and the
 distance formula, the normal-year check and reading uploaded files (position
-from `.geo`, clear errors), with small examples whose answers are known.
-All 52 should pass.
+from `.geo`, clear errors), with small examples whose answers are known, plus keeping and restoring an uploaded file.
+All 55 should pass.
 
 ## Accessibility
 
@@ -167,8 +176,10 @@ All paths in the app are relative, so it works in a sub-folder like that.
 ### Quick: drop the file on the page
 
 Click **Analyse your own CSV** (or drag the file onto the page). The app reads
-it in the browser, so the file never leaves your device, and it is gone when
-you reload. Then use **Settings for your file**:
+it in the browser, so the file never leaves your device. It is gone when you
+reload, unless you tick **Keep this file on this device**: then it is saved in
+the browser's storage (about 5–25 KB), comes back after a reload with its
+settings, and also appears on the results page. Then use **Settings for your file**:
 
 - **Season starts in:** January for most of the northern hemisphere; e.g. July
   for the southern hemisphere, where the season crosses New Year.
@@ -176,6 +187,14 @@ you reload. Then use **Settings for your file**:
 - **Normal years:** all other years with enough pictures are ticked. Years
   that look dry compared with the others are marked "looks dry": untick them
   if they were drought years. Years with too few pictures can't be used.
+
+No export script yet? `tools/earth-engine-export.js` is a Google Earth Engine
+Code Editor script (steps in the app under "How do I get data for my own
+field?"). It uses Sentinel-2 surface reflectance, keeps only clear pixels
+(Scene Classification: vegetation or bare soil), keeps pictures where at least
+80 % of the field is clear, and exports date, year, NDVI, NDMI and the field
+outline. **I wrote it for this app but could not run it**, so check the first
+rows it prints before trusting the export.
 
 If the CSV has Earth Engine's `.geo` column (a Point or the field Polygon) or
 `lat`/`lon` columns, the field also appears on the map. The file needs at
