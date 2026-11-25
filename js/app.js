@@ -273,7 +273,15 @@ async function renderCard({ loading = false } = {}) {
       ${confidenceKpi(confidence(a, p))}
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
-    <p class="meta">${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+    <p class="meta">${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+}
+
+/** Links to the reports that describe what really happened (from fields.json). */
+function sourceLinks(field) {
+  if (!field.sources?.length) return '';
+  return `<span class="sources">${esc(t('sourcesLabel'))}: ${field.sources
+    .map((s, i) => `<a href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.title)}">[${i + 1}]</a>`)
+    .join(' ')}</span>`;
 }
 
 const sinceNote = (n) => (n === 1 ? t('kpiSinceOne') : t('kpiSinceNote', { n }));

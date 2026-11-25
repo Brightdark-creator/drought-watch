@@ -15,35 +15,14 @@
       "lat": 52.95,
       "lon": 10.626,
       "areaHa": 100,
-      "polygon": [
-        [
-          52.94551,
-          10.61855
-        ],
-        [
-          52.95449,
-          10.61855
-        ],
-        [
-          52.95449,
-          10.63345
-        ],
-        [
-          52.94551,
-          10.63345
-        ]
-      ],
+      "polygon": [[52.94551, 10.61855], [52.95449, 10.61855], [52.95449, 10.63345], [52.94551, 10.63345]],
       "file": "de-uelzen.csv",
       "season": 2018,
       "seasonStartMonth": 1,
-      "normalYears": [
-        2017,
-        2021,
-        2023,
-        2024
-      ],
+      "normalYears": [2017, 2021, 2023, 2024],
       "event": {
-        "en": "Drought and heat in spring and summer 2018 across northern and central Europe."
+        "en": "In mid-August 2018 about 90 % of Germany was in drought; the cereal harvest in Lower Saxony was about 22–23 % below normal.",
+        "de": "Mitte August 2018 herrschte in etwa 90 % Deutschlands Dürre; die Getreideernte in Niedersachsen lag etwa 22–23 % unter normal."
       },
       "imageDate": "2018-09-19",
       "images": {
@@ -59,7 +38,21 @@
           "rgb": "images/de-uelzen-normal-rgb.jpg",
           "ndvi": "images/de-uelzen-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "KIT/CEDIM: Drought affected about 90 % of German territory in 2018",
+          "url": "https://www.kit.edu/kit/english/pi_2018_102_drought-affected-about-90-of-the-german-territory.php"
+        },
+        {
+          "title": "Official preliminary harvest result Germany 2018 (ZMP)",
+          "url": "https://www.zmp.de/en/futures/getreide/news/marktbericht/official-preliminary-harvest-result-germany-2018-08-24"
+        }
+      ],
+      "replicates": [
+        { "id": "de-uelzen-2", "lat": 52.9, "lon": 10.7, "file": "replicates/de-uelzen-2.csv" },
+        { "id": "de-uelzen-3", "lat": 52.86, "lon": 10.56, "file": "replicates/de-uelzen-3.csv" }
+      ]
     },
     {
       "id": "it-mantova",
@@ -75,37 +68,14 @@
       "lat": 45.1224,
       "lon": 10.6757,
       "areaHa": 100,
-      "polygon": [
-        [
-          45.11791,
-          10.66933
-        ],
-        [
-          45.12689,
-          10.66933
-        ],
-        [
-          45.12689,
-          10.68207
-        ],
-        [
-          45.11791,
-          10.68207
-        ]
-      ],
+      "polygon": [[45.11791, 10.66933], [45.12689, 10.66933], [45.12689, 10.68207], [45.11791, 10.68207]],
       "file": "it-mantova.csv",
       "season": 2022,
       "seasonStartMonth": 1,
-      "normalYears": [
-        2018,
-        2019,
-        2020,
-        2021,
-        2023,
-        2024
-      ],
+      "normalYears": [2018, 2019, 2020, 2021, 2023, 2024],
       "event": {
-        "en": "Worst drought in the Po basin in about 70 years; state of emergency in summer 2022."
+        "en": "Italy declared a state of emergency in five northern regions on 4 July 2022: the worst drought in the Po basin in 70 years.",
+        "de": "Italien rief am 4. Juli 2022 in fünf nördlichen Regionen den Notstand aus: die schlimmste Dürre im Po-Becken seit 70 Jahren."
       },
       "imageDate": "2022-08-14",
       "images": {
@@ -121,7 +91,17 @@
           "rgb": "images/it-mantova-normal-rgb.jpg",
           "ndvi": "images/it-mantova-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "Euronews: Italy declares a state of emergency amid worst drought in 70 years (4 July 2022)",
+          "url": "https://www.euronews.com/2022/07/04/italy-declares-a-state-of-emergency-in-five-northern-regions-amid-worst-drought-in-70-year"
+        }
+      ],
+      "replicates": [
+        { "id": "it-mantova-2", "lat": 45.18, "lon": 10.55, "file": "replicates/it-mantova-2.csv" },
+        { "id": "it-mantova-3", "lat": 45.02, "lon": 10.95, "file": "replicates/it-mantova-3.csv" }
+      ]
     },
     {
       "id": "us-illinois",
@@ -137,37 +117,14 @@
       "lat": 40.18,
       "lon": -88.4535,
       "areaHa": 100,
-      "polygon": [
-        [
-          40.17551,
-          -88.45938
-        ],
-        [
-          40.18449,
-          -88.45938
-        ],
-        [
-          40.18449,
-          -88.44762
-        ],
-        [
-          40.17551,
-          -88.44762
-        ]
-      ],
+      "polygon": [[40.17551, -88.45938], [40.18449, -88.45938], [40.18449, -88.44762], [40.17551, -88.44762]],
       "file": "us-illinois.csv",
       "season": 2023,
       "seasonStartMonth": 1,
-      "normalYears": [
-        2017,
-        2018,
-        2020,
-        2021,
-        2022,
-        2024
-      ],
+      "normalYears": [2017, 2018, 2020, 2021, 2022, 2024],
       "event": {
-        "en": "Flash drought in May and June 2023 across the Corn Belt; rain returned in July."
+        "en": "Dry spring and early summer 2023 in the Corn Belt, rain in July. Illinois maize still averaged 206 bushels per acre, 2.6 above the trend (the record is 214, from 2022).",
+        "de": "Trockenes Frühjahr und Frühsommer 2023 im Corn Belt, Regen im Juli. Der Mais in Illinois brachte trotzdem im Schnitt 206 Bushel pro Acre, 2,6 über dem Trend (Rekord: 214 im Jahr 2022)."
       },
       "imageDate": "2023-06-28",
       "images": {
@@ -183,7 +140,21 @@
           "rgb": "images/us-illinois-normal-rgb.jpg",
           "ndvi": "images/us-illinois-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "farmdoc daily: The curious case of US corn yields in 2023",
+          "url": "https://farmdocdaily.illinois.edu/2024/03/the-curious-case-of-us-corn-yields-in-2023.html"
+        },
+        {
+          "title": "USDA NASS: Illinois corn production by county 2023",
+          "url": "https://data.nass.usda.gov/Statistics_by_State/Illinois/Publications/County_Estimates/2024/20240223-IL-Corn-Production-by-County.pdf"
+        }
+      ],
+      "replicates": [
+        { "id": "us-illinois-2", "lat": 40.05, "lon": -88.6, "file": "replicates/us-illinois-2.csv" },
+        { "id": "us-illinois-3", "lat": 40.3, "lon": -88.3, "file": "replicates/us-illinois-3.csv" }
+      ]
     },
     {
       "id": "ar-pergamino",
@@ -199,36 +170,14 @@
       "lat": -33.98,
       "lon": -60.7,
       "areaHa": 100,
-      "polygon": [
-        [
-          -33.98449,
-          -60.70542
-        ],
-        [
-          -33.97551,
-          -60.70542
-        ],
-        [
-          -33.97551,
-          -60.69458
-        ],
-        [
-          -33.98449,
-          -60.69458
-        ]
-      ],
+      "polygon": [[-33.98449, -60.70542], [-33.97551, -60.70542], [-33.97551, -60.69458], [-33.98449, -60.69458]],
       "file": "ar-pergamino.csv",
       "season": 2022,
       "seasonStartMonth": 7,
-      "normalYears": [
-        2016,
-        2018,
-        2019,
-        2020,
-        2023
-      ],
+      "normalYears": [2016, 2018, 2019, 2020, 2023],
       "event": {
-        "en": "Historic drought in the 2022/23 summer season in the Pampas."
+        "en": "Argentina's worst drought in about 60 years: the 2022/23 soybean harvest fell by about half (−51.5 %).",
+        "de": "Argentiniens schlimmste Dürre seit etwa 60 Jahren: Die Sojaernte 2022/23 fiel um etwa die Hälfte (−51,5 %)."
       },
       "imageDate": "2023-01-16",
       "images": {
@@ -244,7 +193,21 @@
           "rgb": "images/ar-pergamino-normal-rgb.jpg",
           "ndvi": "images/ar-pergamino-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "Al Jazeera: Argentina's grain harvest suffers under worst drought in 60 years",
+          "url": "https://www.aljazeera.com/news/2023/3/9/argentinas-grain-harvest-suffers-under-worst-drought-in-60-years"
+        },
+        {
+          "title": "Buenos Aires Times: Drought slashes Argentina's soybean production by 51.5 %",
+          "url": "https://batimes.com.ar/news/amp/economy/drought-slashes-argentinas-soybean-production-by-515.phtml"
+        }
+      ],
+      "replicates": [
+        { "id": "ar-pergamino-2", "lat": -34.08, "lon": -60.55, "file": "replicates/ar-pergamino-2.csv" },
+        { "id": "ar-pergamino-3", "lat": -33.85, "lon": -60.85, "file": "replicates/ar-pergamino-3.csv" }
+      ]
     },
     {
       "id": "ma-chaouia",
@@ -260,35 +223,14 @@
       "lat": 33.05,
       "lon": -7.55,
       "areaHa": 100,
-      "polygon": [
-        [
-          33.04551,
-          -7.55536
-        ],
-        [
-          33.05449,
-          -7.55536
-        ],
-        [
-          33.05449,
-          -7.54464
-        ],
-        [
-          33.04551,
-          -7.54464
-        ]
-      ],
+      "polygon": [[33.04551, -7.55536], [33.05449, -7.55536], [33.05449, -7.54464], [33.04551, -7.54464]],
       "file": "ma-chaouia.csv",
       "season": 2021,
       "seasonStartMonth": 9,
-      "normalYears": [
-        2016,
-        2017,
-        2018,
-        2020
-      ],
+      "normalYears": [2016, 2017, 2018, 2020],
       "event": {
-        "en": "Severe drought in the 2021/22 winter-wheat season, one of the driest in decades."
+        "en": "Rain from November 2021 to February 2022 was about half the average; Morocco's cereal harvest fell from about 10.5 to 3.3 million tonnes (FAO).",
+        "de": "Von November 2021 bis Februar 2022 fiel nur etwa halb so viel Regen wie üblich; Marokkos Getreideernte fiel von etwa 10,5 auf 3,3 Millionen Tonnen (FAO)."
       },
       "imageDate": "2022-02-20",
       "images": {
@@ -304,7 +246,21 @@
           "rgb": "images/ma-chaouia-normal-rgb.jpg",
           "ndvi": "images/ma-chaouia-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "Morocco World News: FAO – Morocco's cereal production to drop by 68.4 % in 2022",
+          "url": "https://www.moroccoworldnews.com/2022/07/350182/fao-moroccos-cereal-production-to-drop-by-68-4-in-2022"
+        },
+        {
+          "title": "Bloomberg: Worst drought in decades grips swathe of North Africa (Feb 2022)",
+          "url": "https://www.bloomberg.com/news/articles/2022-02-09/wheat-wilts-cities-ration-water-as-drought-grips-north-africa"
+        }
+      ],
+      "replicates": [
+        { "id": "ma-chaouia-2", "lat": 32.95, "lon": -7.65, "file": "replicates/ma-chaouia-2.csv" },
+        { "id": "ma-chaouia-3", "lat": 33.0, "lon": -7.42, "file": "replicates/ma-chaouia-3.csv" }
+      ]
     },
     {
       "id": "au-temora",
@@ -320,35 +276,14 @@
       "lat": -34.395,
       "lon": 147.458,
       "areaHa": 100,
-      "polygon": [
-        [
-          -34.39949,
-          147.45256
-        ],
-        [
-          -34.39051,
-          147.45256
-        ],
-        [
-          -34.39051,
-          147.46344
-        ],
-        [
-          -34.39949,
-          147.46344
-        ]
-      ],
+      "polygon": [[-34.39949, 147.45256], [-34.39051, 147.45256], [-34.39051, 147.46344], [-34.39949, 147.46344]],
       "file": "au-temora.csv",
       "season": 2019,
       "seasonStartMonth": 1,
-      "normalYears": [
-        2016,
-        2020,
-        2021,
-        2022
-      ],
+      "normalYears": [2016, 2020, 2021, 2022],
       "event": {
-        "en": "Drought across New South Wales, worst in 2019 (winter crop season)."
+        "en": "2019 was New South Wales' hottest and driest year on record; winter crops in southern NSW had very low yields.",
+        "de": "2019 war das heißeste und trockenste Jahr seit Messbeginn in New South Wales; die Wintergetreide im Süden von NSW brachten sehr geringe Erträge."
       },
       "imageDate": "2019-10-15",
       "images": {
@@ -364,7 +299,21 @@
           "rgb": "images/au-temora-normal-rgb.jpg",
           "ndvi": "images/au-temora-normal-ndvi.jpg"
         }
-      }
+      },
+      "sources": [
+        {
+          "title": "NSW DPI: State Seasonal Update, October 2019",
+          "url": "https://www.dpi.nsw.gov.au/climate-and-emergencies/seasonal-conditions/ssu/october-2019"
+        },
+        {
+          "title": "The Daily Advertiser: State swelters through 2019, its hottest, driest year on record",
+          "url": "https://www.dailyadvertiser.com.au/story/6573649/state-swelters-through-2019-enduring-hottest-driest-year-on-record"
+        }
+      ],
+      "replicates": [
+        { "id": "au-temora-2", "lat": -34.45, "lon": 147.3, "file": "replicates/au-temora-2.csv" },
+        { "id": "au-temora-3", "lat": -34.55, "lon": 147.5, "file": "replicates/au-temora-3.csv" }
+      ]
     }
   ],
   "imageDateNote": "imageDate = date for the 'Seen from space' pictures: the worst point of the season found by the app (peakPeriod); for Illinois, which had no warning, the time of the reported flash drought."

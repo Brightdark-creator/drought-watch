@@ -25,7 +25,14 @@ async function init() {
   const fields = [...(await Data.listFields()), ...Data.restoreKeptUploads()];
   const results = await Promise.all(fields.map(async (field) => {
     const a = analyseField(field, await Data.loadSeries(field));
-    return { field, a, s: seasonSummary(a) };
+    // Nearby spots: the same rule, season and normal years, 8–15 km away.
+    const nearby = await Promise.all((field.replicates || []).map(async (r) => {
+      try {
+        const ra = analyseField({ ...field, ...r }, await Data.loadSeries({ ...field, ...r }));
+        return { r, a: ra, s: seasonSummary(ra) };
+      } catch { return null; } // file not downloaded yet
+    }));
+    return { field, a, s: seasonSummary(a), nearby: nearby.filter(Boolean) };
   }));
 
   const day = (a, p) => (p == null ? '–' : esc(formatDate(a.dates[p], { day: 'numeric', month: 'short' })));
@@ -42,8 +49,9 @@ async function init() {
       <th scope="col">${esc(t('colLowestNdmi'))}</th>
       <th scope="col">${esc(t('colLowestNdvi'))}</th>
       <th scope="col">${esc(t('colRed'))}</th>
+      <th scope="col">${esc(t('colNearby'))}</th>
     </tr></thead>
-    <tbody>${results.map(({ field, a, s }) => `<tr>
+    <tbody>${results.map(({ field, a, s, nearby }) => `<tr>
       <th scope="row">${esc(pick(field.short))}</th>
       <td><span class="mini lvl-${s.worst}" aria-hidden="true">${SYMBOLS[s.worst]}</span> ${esc(t(`level_${s.worst}`))}</td>
       <td>${day(a, s.warningStart)}</td>
@@ -52,6 +60,7 @@ async function init() {
       <td>${zAt(a, s.lowestNdmi)}</td>
       <td>${zAt(a, s.lowestNdvi)}</td>
       <td>${s.redPeriods}</td>
+      <td>${nearbyHtml(nearby, day)}</td>
     </tr>`).join('')}</tbody>
   </table>`;
 
@@ -62,6 +71,7 @@ async function init() {
       <h3><span class="mini lvl-${s.worst}" aria-hidden="true">${SYMBOLS[s.worst]}</span> ${esc(pick(field.name))}</h3>
       <p class="meta">${esc(field.uploaded ? t('fromYourFile') : t(`crop_${field.crop}`))} · ${esc(t('season'))} ${a.season} · ${esc(t('comparedWith', { years: formatList(a.normalYears) }))}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}</p>
       ${field.event ? `<p class="event"><b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))}</p>` : ''}
+      ${field.sources?.length ? `<ul class="source-list">${field.sources.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a></li>`).join('')}</ul>` : ''}
       <div class="timeline">${timelineHtml(a, null, monthLabel)}</div>
       <p>${s.lead
         ? esc(t('summaryLead', { ndmiDate: formatDate(a.dates[s.lead.ndmiStart]), ndviDate: formatDate(a.dates[s.lead.ndviRed]), days: s.lead.days }))
@@ -73,11 +83,22 @@ async function init() {
   const leads = results.map((r) => r.s.lead?.days).filter((d) => d != null);
   const red = results.filter((r) => r.s.worst === 'red').length;
   const parts = [t('summaryDetected', { n: red, total: results.length })];
+  const spots = results.flatMap((r) => r.nearby);
+  if (spots.length) {
+    const agree = results.reduce((n, r) => n + r.nearby.filter((x) => (x.s.worst === 'red') === (r.s.worst === 'red')).length, 0);
+    parts.push(t('summaryNearby', { agree, total: spots.length }));
+  }
   if (leads.length) {
     const avg = Math.round(leads.reduce((x, y) => x + y, 0) / leads.length);
     parts.push(t('summaryHeadline', { days: avg, count: leads.length }));
   }
   $('headline').textContent = parts.join(' ');
+}
+
+/** Result at the nearby spots: symbol + first red date for each. */
+function nearbyHtml(nearby, day) {
+  if (!nearby.length) return '–';
+  return nearby.map(({ a, s }) => `<span class="nearby"><span class="mini lvl-${s.worst}" aria-hidden="true">${SYMBOLS[s.worst]}</span> ${s.firstRed != null ? day(a, s.firstRed) : esc(t(`level_${s.worst}`))}</span>`).join('<br>');
 }
 
 /** Small table: each normal year compared with the other normal years. */

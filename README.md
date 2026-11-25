@@ -69,11 +69,11 @@ turning red.
 **What this shows**
 - 5 of 6 drought seasons got a red warning. Where greenness also fell far
   below normal (4 areas), leaf water warned **24 days earlier on average**.
-- **Illinois 2023: no warning.** The flash drought hit in May–June while the
+- **Illinois 2023: no warning.** The dry spell hit in May–June while the
   crops were small (before the growing season the app judges), and rain came
-  back in July. As far as I know Illinois still harvested a record maize crop
-  in 2023, so "no damage visible from space" may be the right answer. Check
-  this against USDA statistics before you use it in your report.
+  back in July. Illinois maize still averaged 206 bushels per acre, 2.6 above
+  the trend (USDA NASS; the record is 214 from 2022), so "no damage visible
+  from space" is consistent with the harvest.
 - **Argentina:** red for only one picture in mid-January, then green again
   (late-sown or replanted crops). The drought was real but the signal at this
   spot is short.
@@ -91,12 +91,24 @@ turning red.
   harvest nationally; the area probably had a different land use or timing
   that year. This is what the check is for: a reason to look closer.
 
-**Where the normal years come from:** known drought history (e.g. Germany was
-also dry in 2019, 2020 and 2022; Italy in 2017; Argentina in 2017/18 and
-2021/22; Morocco in 2019/20, 2022/23 and 2023/24; New South Wales in 2017–2018;
-Illinois 2019 was left out because floods delayed planting by weeks). Please
-confirm these with sources (national weather services, FAO/GIEWS, USDA) for
-your report.
+**Where the normal years come from:** known drought history, checked with
+sources: Germany was also dry in 2019, 2020 and 2022 (one multi-year drought
+2018–2022 in the research literature); Argentina in 2017/18 (worst in decades
+in the core region); Morocco in 2019/20 (harvest about half of normal) and
+2022/23–2023/24, while 2020/21 was a record harvest (about 10.3–10.5 Mt);
+New South Wales in 2017–2018. Illinois 2019 was left out because floods
+delayed planting by weeks. Italy 2017 and Argentina 2021/22 were left out as
+dry years from general drought reporting (not separately checked here).
+
+**Sources for the drought events** are in `data/fields.json` (`sources`), and
+the app and results page link to them. Main ones:
+- Germany: [KIT/CEDIM 2018 drought](https://www.kit.edu/kit/english/pi_2018_102_drought-affected-about-90-of-the-german-territory.php), [preliminary 2018 harvest result](https://www.zmp.de/en/futures/getreide/news/marktbericht/official-preliminary-harvest-result-germany-2018-08-24)
+- Italy: [state of emergency, 4 July 2022](https://www.euronews.com/2022/07/04/italy-declares-a-state-of-emergency-in-five-northern-regions-amid-worst-drought-in-70-year)
+- USA: [farmdoc daily on 2023 yields](https://farmdocdaily.illinois.edu/2024/03/the-curious-case-of-us-corn-yields-in-2023.html), [USDA NASS Illinois county yields 2023](https://data.nass.usda.gov/Statistics_by_State/Illinois/Publications/County_Estimates/2024/20240223-IL-Corn-Production-by-County.pdf)
+- Argentina: [worst drought in 60 years](https://www.aljazeera.com/news/2023/3/9/argentinas-grain-harvest-suffers-under-worst-drought-in-60-years), [soybean harvest −51.5 %](https://batimes.com.ar/news/amp/economy/drought-slashes-argentinas-soybean-production-by-515.phtml), [2017/18 drought](https://www.bcr.com.ar/es/print/pdf/node/3626)
+- Morocco: [FAO: cereal production −68 % in 2022](https://www.moroccoworldnews.com/2022/07/350182/fao-moroccos-cereal-production-to-drop-by-68-4-in-2022), [record 2021 harvest](https://www.moroccoworldnews.com/2021/07/343599/morocco-records-very-good-cereal-harvest-season)
+- Australia: [NSW DPI seasonal update Oct 2019](https://www.dpi.nsw.gov.au/climate-and-emergencies/seasonal-conditions/ssu/october-2019), [NSW's hottest, driest year on record](https://www.dailyadvertiser.com.au/story/6573649/state-swelters-through-2019-enduring-hottest-driest-year-on-record)
+- Germany 2019–2022: [multi-year drought study](https://nhess.copernicus.org/preprints/nhess-2023-228/nhess-2023-228-manuscript-version2.pdf)
 
 To refresh or add areas: edit `AREAS` in `tools/fetch_sentinel2.py`, run it,
 add the area to `data/fields.json`, then run `tools/fetch_images.py`.

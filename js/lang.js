@@ -58,6 +58,7 @@ export const STRINGS = {
     crop_maize: 'Maize',
     crop_mixed: 'Mixed farmland',
     eventLabel: 'What happened',
+    sourcesLabel: 'Sources',
     crop_unknown: 'Unknown crop',
     simulated: 'simulated sample data',
 
@@ -118,6 +119,8 @@ export const STRINGS = {
     colLowestNdmi: 'Lowest leaf water',
     colLowestNdvi: 'Lowest greenness',
     colRed: 'Red periods',
+    colNearby: 'Two spots nearby',
+    summaryNearby: 'At 2 more spots per region (8–15 km away), {agree} of {total} gave the same answer (red or not).',
     season: 'Season',
     openInApp: 'Open this field in the app',
     backToApp: 'Back to the app',
@@ -232,6 +235,7 @@ export const STRINGS = {
     crop_maize: 'Mais',
     crop_mixed: 'Gemischtes Ackerland',
     eventLabel: 'Was passiert ist',
+    sourcesLabel: 'Quellen',
     crop_unknown: 'Unbekannte Kultur',
     simulated: 'simulierte Beispieldaten',
 
@@ -292,6 +296,8 @@ export const STRINGS = {
     colLowestNdmi: 'Tiefstes Blattwasser',
     colLowestNdvi: 'Tiefstes Blattgrün',
     colRed: 'Rote Zeiträume',
+    colNearby: 'Zwei Orte in der Nähe',
+    summaryNearby: 'An 2 weiteren Orten pro Region (8–15 km entfernt) kamen {agree} von {total} zum selben Ergebnis (rot oder nicht).',
     season: 'Saison',
     openInApp: 'Dieses Feld in der App öffnen',
     backToApp: 'Zurück zur App',

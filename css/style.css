@@ -432,7 +432,11 @@ tr.current { background: var(--accent-soft); }
 .field-card .meta { margin: 0 0 12px; }
 .field-card .bars { cursor: default; }
 .field-card p { margin: 10px 0 0; }
-.field-card .event { margin: 0 0 12px; font-size: 0.9rem; }
+.field-card .event { margin: 0 0 4px; font-size: 0.9rem; }
+.source-list { margin: 0 0 12px; padding-left: 1.2em; font-size: 0.82rem; color: var(--muted); }
+.source-list a, .meta a { color: var(--accent); font-weight: 700; }
+.sources { white-space: nowrap; }
+.nearby { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .normal-check { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg); }
 .normal-check summary { cursor: pointer; font-weight: 700; }
 .normal-check table { margin-top: 8px; }

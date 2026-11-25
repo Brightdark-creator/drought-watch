@@ -55,6 +55,28 @@ AREAS = {
 }
 
 
+# Two more farmland spots per region, 8-15 km from the main area (checked on
+# satellite pictures: no towns, rivers or bush). They test whether the result
+# repeats nearby. Written to data/replicates/.
+REPLICATES = {
+    "de-uelzen-2":    {"lat": 52.900, "lon": 10.700, "of": "de-uelzen"},
+    "de-uelzen-3":    {"lat": 52.860, "lon": 10.560, "of": "de-uelzen"},
+    "it-mantova-2":   {"lat": 45.180, "lon": 10.550, "of": "it-mantova"},
+    "it-mantova-3":   {"lat": 45.020, "lon": 10.950, "of": "it-mantova"},
+    "us-illinois-2":  {"lat": 40.050, "lon": -88.600, "of": "us-illinois"},
+    "us-illinois-3":  {"lat": 40.300, "lon": -88.300, "of": "us-illinois"},
+    "ar-pergamino-2": {"lat": -34.080, "lon": -60.550, "of": "ar-pergamino"},
+    "ar-pergamino-3": {"lat": -33.850, "lon": -60.850, "of": "ar-pergamino"},
+    "ma-chaouia-2":   {"lat": 32.950, "lon": -7.650, "of": "ma-chaouia"},
+    "ma-chaouia-3":   {"lat": 33.000, "lon": -7.420, "of": "ma-chaouia"},
+    "au-temora-2":    {"lat": -34.450, "lon": 147.300, "of": "au-temora"},
+    "au-temora-3":    {"lat": -34.550, "lon": 147.500, "of": "au-temora"},
+}
+for _name, _r in REPLICATES.items():  # same size and years as the main area
+    _main = AREAS[_r["of"]]
+    _r.update({"size_km": _main["size_km"], "start": _main["start"], "end": _main["end"], "folder": "replicates"})
+
+
 def square(lat, lon, size_km):
     """A square polygon around the centre, as GeoJSON ([lon, lat] order)."""
     half = size_km / 2
@@ -128,7 +150,9 @@ def fetch_area(name, cfg):
     with ThreadPoolExecutor(WORKERS) as pool:
         rows = [r for r in pool.map(lambda it: picture_stats(it, feature), items) if r]
     rows.sort()
-    path = OUT / f"{name}.csv"
+    folder = OUT / cfg.get("folder", "")
+    folder.mkdir(exist_ok=True)
+    path = folder / f"{name}.csv"
     with path.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["date", "year", "NDVI", "NDMI", "clear"])
@@ -139,6 +163,10 @@ def fetch_area(name, cfg):
 
 
 if __name__ == "__main__":
-    wanted = sys.argv[1:] or list(AREAS)
+    ALL = {**AREAS, **REPLICATES}
+    if sys.argv[1:] == ["--replicates"]:
+        wanted = list(REPLICATES)
+    else:
+        wanted = sys.argv[1:] or list(AREAS)
     for name in wanted:
-        fetch_area(name, AREAS[name])
+        fetch_area(name, ALL[name])
