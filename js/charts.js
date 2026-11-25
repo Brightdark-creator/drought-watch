@@ -60,6 +60,24 @@ const selectedLine = {
   },
 };
 
+const CHART_JS = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+let chartJsLoading = null;
+
+/** Download Chart.js only when it is needed (never in light mode). */
+export function loadChartJs() {
+  if (window.Chart) return Promise.resolve();
+  if (!chartJsLoading) {
+    chartJsLoading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = CHART_JS;
+      script.onload = resolve;
+      script.onerror = () => { chartJsLoading = null; reject(new Error('Chart.js could not be loaded')); };
+      document.head.appendChild(script);
+    });
+  }
+  return chartJsLoading;
+}
+
 export class IndexChart {
   constructor(canvas) {
     this.canvas = canvas;

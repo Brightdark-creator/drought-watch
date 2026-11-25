@@ -14,17 +14,20 @@ runs as a static site (GitHub Pages).
 ```
 drought-watch/
 ├── index.html              page layout: map, warning card, timeline, charts
+├── summary.html            results for all fields on one printable page (for the judges)
 ├── tests.html              automatic tests of the science code (open in the browser)
 ├── sw.js                   offline support (service worker)
 ├── manifest.webmanifest    lets phones install the app on the home screen
-├── icons/icon.svg          app icon
+├── icons/                  app icon (SVG + PNG sizes for phones)
 ├── css/style.css           design (mobile first)
 ├── js/
 │   ├── app.js              connects everything: input → data → analysis → screen
 │   ├── data.js             THE ONLY place that loads data (swap for a live API later)
 │   ├── analysis.js         the science: normal range, anomaly (z-score), traffic light
 │   ├── visuals.js          wilting-plant picture, anomaly meters, season timeline
-│   ├── charts.js           NDVI/NDMI line charts (Chart.js)
+│   ├── charts.js           NDVI/NDMI line charts (Chart.js, downloaded only when needed)
+│   ├── charts-lite.js      tiny SVG chart for light mode (no download)
+│   ├── summary.js          builds the results page
 │   ├── map.js              world map (Leaflet + OpenStreetMap), loaded only when shown
 │   ├── geocode.js          place search (Nominatim)
 │   ├── i18n.js             picks the language, formats dates/numbers/units
@@ -81,17 +84,29 @@ measure how early the warning came.
   warning, so it also works without colour vision. Click a bar to jump there.
 - **Charts:** this season against the normal range; the growing season is
   unshaded, the rest is lightly shaded.
+- **Confidence:** high / medium / low, with the reasons: how many normal years
+  there are for that date (5+ is good, 3 is the minimum), how long ago the
+  previous picture was (the red rule needs two pictures in a row), and whether
+  the value sits right at a warning limit (within 0.25 SD = close call).
 - **Show the numbers:** the same data as a table (screen readers, checking).
 - **Map:** satellite picture (Sentinel-2 cloudless) or street map; your choice
   is remembered. The location button finds the test field nearest to you.
+
+## Results page for the judges
+
+`summary.html` (link at the bottom of the app) runs the same rule on every
+field and lists, side by side: worst level, when the warning started, first
+red, lead time, lowest leaf water and greenness, and the number of red
+periods, plus each field's season timeline. The Print button gives a clean
+handout.
 
 ## Tests
 
 Open <http://localhost:8000/tests.html> while the local server runs. It checks
 the calendar, the average/SD/z-score, every part of the warning rule (yellow,
 red only twice in a row, cloudy gaps, SD minimum, too few normal years), the
-lead time, the CSV reader and the distance formula with small examples whose
-answers are known. All 31 should pass.
+lead time, the season summary, the confidence label, the CSV reader and the
+distance formula with small examples whose answers are known. All 40 should pass.
 
 ## Run it on your computer
 
@@ -172,6 +187,11 @@ backend (e.g. a small Python server that queries Copernicus Data Space or
 Earth Engine) and return the same shapes described at the top of the file.
 `findField` could then create a new field for any clicked point.
 
+## Language
+
+The app always starts in English. German is in the language menu; the choice
+is remembered on that device.
+
 ## Add a language
 
 Copy the `en` block in `js/lang.js`, rename it (e.g. `fr`) and translate the
@@ -188,8 +208,9 @@ On a phone, "Add to Home Screen" installs it like an app.
 
 ## Light mode
 
-"Light mode (no map)" hides the map and never downloads the map library or
-map tiles. It turns on by itself when the browser reports "data saver" or a
+"Light mode (no map)" hides the map and draws the charts with the small SVG
+chart, so it downloads no libraries and no map pictures at all: only the
+app's own files and the field data. It turns on by itself when the browser reports "data saver" or a
 2G connection; the choice is remembered on that device.
 
 ## Credits and limits

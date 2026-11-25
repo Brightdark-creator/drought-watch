@@ -27,7 +27,7 @@
   <ul id="results"></ul>
 </main>
 <script type="module">
-  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, SD_FLOOR } from './js/analysis.js';
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, SD_FLOOR } from './js/analysis.js';
   import { parseCsv, distanceKm } from './js/data.js';
 
   const results = [];
@@ -116,6 +116,23 @@
   /* ---------- Not enough normal years ---------- */
   const d = analyseField({ ...field, normalYears: [2010, 2011] }, rows);
   check('With only 2 normal years there is no judgement ("unknown")', d.overall[15] === 'unknown');
+
+  /* ---------- Season summary (results page) ---------- */
+  const sum = seasonSummary(a);
+  check('Summary: first red in period 17, warning started in period 15', sum.firstRed === 17 && sum.warningStart === 15);
+  check('Summary: 3 red periods (17, 18 from leaf water, 19 from greenness)', sum.redPeriods === 3, `got ${sum.redPeriods}`);
+  check('Summary: lowest leaf water is −3 SD in period 18', close(sum.lowestNdmi.z, -3, 1e-9) && sum.lowestNdmi.period === 18);
+  check('Summary: worst level of the season is red', sum.worst === 'red');
+
+  /* ---------- Confidence ---------- */
+  check('Confidence high: 5 normal years, previous picture 10 days earlier, clear result', confidence(a, 15)?.level === 'high');
+  check('Confidence still high with one cloudy period (20 days gap)', confidence(b, 18)?.level === 'high' && confidence(b, 18).gapDays === 20);
+  check('Confidence only medium after two cloudy periods (30 days gap)', confidence(analyseField(field, gap2), 18)?.level === 'medium');
+  check('Confidence low with too few normal years', confidence(d, 15)?.level === 'low');
+  const nearRows = rows.map((r) => (r.date.getUTCFullYear() === 2020 && seasonAndPeriod(r.date).period === 14
+    ? { ...r, ndmi: r.ndmi - 1.1 * sd } : r));
+  check('A value right next to a limit (z = −1.1) is a close call: medium', confidence(analyseField(field, nearRows), 14)?.nearLimit === true
+    && confidence(analyseField(field, nearRows), 14).level === 'medium');
 
   /* ---------- CSV reader ---------- */
   const csv = 'system:index,date,year,NDVI,NDMI,.geo\n'

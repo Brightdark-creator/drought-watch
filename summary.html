@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Results for all fields</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/summary.js"></script>
+</head>
+<body class="summary-page">
+  <header class="topbar">
+    <div class="brand">
+      <img class="logo" src="icons/icon.svg" alt="" width="36" height="36">
+      <div>
+        <h1 data-i18n="summaryTitle">Results for all fields</h1>
+        <p class="tagline" data-i18n="appTitle"></p>
+      </div>
+    </div>
+    <div class="settings">
+      <a class="button-link" href="./" data-i18n="backToApp"></a>
+      <button id="print" type="button" class="toggle" data-i18n="print"></button>
+    </div>
+  </header>
+
+  <main>
+    <p id="headline" class="headline"></p>
+    <p class="intro" data-i18n="summaryIntro"></p>
+
+    <section class="panel">
+      <h2 data-i18n="summaryOverview"></h2>
+      <div id="overview" class="table-wrap"></div>
+      <p class="hint" data-i18n="summaryColumns"></p>
+    </section>
+
+    <section>
+      <h2 data-i18n="summaryFields"></h2>
+      <div id="fields" class="field-cards"></div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="howTitle"></h2>
+      <p data-i18n="how1"></p>
+      <p data-i18n="how2"></p>
+      <p data-i18n="how3"></p>
+      <p data-i18n="how4"></p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p data-i18n="footerSample"></p>
+  </footer>
+</body>
+</html>

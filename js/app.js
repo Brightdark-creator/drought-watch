@@ -7,7 +7,7 @@
  *   i18n.js / lang.js  all texts, dates and numbers
  */
 import * as Data from './data.js';
-import { analyseField, warningSince, leadTime, SYMBOLS } from './analysis.js';
+import { analyseField, warningSince, leadTime, confidence, SYMBOLS } from './analysis.js';
 import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
   t, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
@@ -15,7 +15,8 @@ import {
 } from './i18n.js';
 import { STRINGS } from './lang.js';
 import * as MapView from './map.js';
-import { IndexChart } from './charts.js';
+import { IndexChart, loadChartJs } from './charts.js';
+import { drawLiteChart } from './charts-lite.js';
 import { searchPlace } from './geocode.js';
 
 /* ---------- App state (everything the screen shows comes from here) ---------- */
@@ -250,7 +251,25 @@ async function renderCard({ loading = false } = {}) {
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
     ${lead ? `<p class="lead"><span class="lead-days">${esc(t('leadDays', { days: lead.days }))}</span>${esc(t('leadTime', { days: lead.days }))}</p>` : ''}
+    ${confidenceHtml(confidence(a, p))}
     <p class="meta">${facts.map(esc).join(' · ')}</p>`;
+}
+
+/** Small "Confidence: high" label with the reasons behind it. */
+function confidenceHtml(c) {
+  if (!c) return '';
+  const reasons = [
+    t('confYears', { n: c.normalYears }),
+    c.gapDays == null ? t('confFirst') : t('confGap', { days: c.gapDays }),
+    c.nearLimit ? t('confNear') : null,
+  ].filter(Boolean);
+  const bars = { high: 3, medium: 2, low: 1 }[c.level];
+  const icon = [1, 2, 3].map((i) => `<i class="${i <= bars ? 'on' : ''}"></i>`).join('');
+  return `<p class="confidence conf-${c.level}" title="${esc(t('confExplain'))}">
+    <span class="conf-icon" aria-hidden="true">${icon}</span>
+    <b>${esc(t('confidence', { level: t(`conf_${c.level}`) }))}</b>
+    <span>${esc(reasons.join(' · '))}</span>
+  </p>`;
 }
 
 /** The season at a glance: one bar per 10-day period (click a bar to jump there). */
@@ -308,17 +327,34 @@ function renderCompare(a) {
     .join('');
 }
 
-function renderCharts(a) {
-  if (!window.Chart) { showMessage(t('chartError')); return; }
+/**
+ * Draw both charts. Normal mode uses Chart.js (with hover tooltips), light
+ * mode the small SVG chart in charts-lite.js, which needs no download.
+ */
+async function renderCharts(a) {
+  const lite = state.light;
+  if (!lite) {
+    try {
+      await loadChartJs();
+    } catch (error) {
+      console.error(error);
+      showMessage(t('chartError'));
+    }
+  }
+  const useLite = lite || !window.Chart; // fall back to the SVG chart if Chart.js failed
   const p = state.period ?? -1;
   const labels = a.labels.map((d) => formatShortDate(d));
   for (const key of ['ndvi', 'ndmi']) {
-    charts[key] ||= new IndexChart($(`chart-${key}`));
+    $(`chart-${key}`).hidden = useLite;
+    $(`lite-${key}`).hidden = !useLite;
     const s = a[key];
     // "Replay": only show pictures up to the chosen date, like on that day.
     const cut = (arr) => arr.map((v, i) => (i <= p ? v : null));
     const levels = s.level.map((lv, i) => (a.inSeason[i] ? lv : 'off'));
-    charts[key].update({
+    const chart = useLite
+      ? { update: (d) => drawLiteChart($(`lite-${key}`), { ...d, dates: a.labels, monthLabel: (date) => esc(formatDate(date, { month: 'short' })) }) }
+      : (charts[key] ||= new IndexChart($(`chart-${key}`)));
+    chart.update({
       labels,
       values: cut(s.values),
       valuesAll: s.values,
@@ -335,7 +371,7 @@ function renderCharts(a) {
       format: (v, digits = 2) => formatNumber(v, digits),
     });
     const level = state.period == null ? 'unknown' : (levels[state.period] || 'unknown');
-    $(`chart-${key}`).setAttribute('aria-label', t('chartAria', { name: t(`${key}Name`), year: a.season, level: t(`level_${level}`) }));
+    $(useLite ? `lite-${key}` : `chart-${key}`).setAttribute('aria-label', t('chartAria', { name: t(`${key}Name`), year: a.season, level: t(`level_${level}`) }));
   }
   renderLegend(a);
 }
@@ -404,6 +440,7 @@ async function setLightMode(on, { save = true } = {}) {
   renderLightToggle();
   if (on) MapView.destroyMap();
   else if (state.fields.length) await startMap();
+  if (currentField()) rerender(); // switch between the light and the full chart
 }
 
 /* ---------- "Use my location" ---------- */
@@ -474,6 +511,12 @@ function wireControls() {
   window.addEventListener('online', hideMessage);
   // Redraw the timeline month labels when the screen gets narrower or wider.
   window.matchMedia('(max-width: 560px)').addEventListener('change', rerender);
+  // The light chart is drawn for the exact width, so redraw it after resizing.
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (state.light && currentField()) rerender(); }, 200);
+  });
   $('chips').addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (chip) selectField(chip.dataset.id);

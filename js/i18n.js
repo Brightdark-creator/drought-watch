@@ -8,14 +8,13 @@ import { STRINGS } from './lang.js';
 export const LANGUAGES = Object.keys(STRINGS); // ['en', 'de']
 let current = 'en';
 
-/** First browser language we support, otherwise English. */
+/**
+ * The app always starts in English. Other languages are chosen in the
+ * language menu, and that choice is remembered on the device.
+ */
+export const DEFAULT_LANGUAGE = 'en';
 export function initialLanguage() {
-  const wanted = navigator.languages || [navigator.language || 'en'];
-  for (const tag of wanted) {
-    const base = tag.slice(0, 2).toLowerCase();
-    if (LANGUAGES.includes(base)) return base;
-  }
-  return 'en';
+  return DEFAULT_LANGUAGE;
 }
 
 export function setLanguage(lang) {

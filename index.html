@@ -8,9 +8,11 @@
   <meta name="theme-color" content="#1f6f50">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Drought Watch">
   <link rel="stylesheet" href="css/style.css">
-  <!-- Chart.js draws the line charts. Leaflet (the map) is loaded later by js/map.js, and never in light mode. -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <!-- Libraries are downloaded only when needed: Leaflet (map) by js/map.js and Chart.js by js/charts.js.
+       Light mode needs neither, so it loads fast on slow internet. -->
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
@@ -79,11 +81,11 @@
 
       <figure class="chart-box">
         <figcaption data-i18n="ndmiName"></figcaption>
-        <div class="chart-wrap"><canvas id="chart-ndmi" role="img"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-ndmi" role="img"></canvas><div id="lite-ndmi" class="lite-chart" role="img" hidden></div></div>
       </figure>
       <figure class="chart-box">
         <figcaption data-i18n="ndviName"></figcaption>
-        <div class="chart-wrap"><canvas id="chart-ndvi" role="img"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-ndvi" role="img"></canvas><div id="lite-ndvi" class="lite-chart" role="img" hidden></div></div>
       </figure>
       <ul id="legend" class="legend"></ul>
       <details class="table-box">
@@ -102,6 +104,7 @@
   </main>
 
   <footer class="footer">
+    <p><a href="summary.html" data-i18n="summaryLink"></a> · <a href="tests.html">Tests</a></p>
     <p data-i18n="footerSample"></p>
     <p data-i18n="footerCredits"></p>
   </footer>

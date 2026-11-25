@@ -11,15 +11,18 @@
  *
  * After changing app files, raise VERSION so old copies are thrown away.
  */
-const VERSION = 'drought-watch-v2';
+const VERSION = 'drought-watch-v3';
 
 const APP_FILES = [
-  './', './index.html', './manifest.webmanifest', './icons/icon.svg', './css/style.css',
+  './', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
   './js/app.js', './js/data.js', './js/analysis.js', './js/visuals.js', './js/charts.js',
-  './js/map.js', './js/geocode.js', './js/i18n.js', './js/lang.js',
+  './js/map.js', './js/geocode.js', './js/i18n.js', './js/lang.js', './js/charts-lite.js',
+  './js/summary.js', './summary.html',
   './data/fields.json', './data/de-uelzen.csv', './data/it-mantova.csv', './data/us-illinois.csv',
 ];
-const LIBRARIES = ['https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'];
+// Libraries are saved the first time they are used (see cacheFirst), not up front,
+// so light mode never downloads them.
+const LIBRARIES = [];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll([...APP_FILES, ...LIBRARIES])).then(() => self.skipWaiting()));

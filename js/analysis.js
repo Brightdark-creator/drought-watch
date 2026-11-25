@@ -207,8 +207,10 @@ export function analyseField(field, rows) {
   for (const k of INDICES) {
     const mean = [];
     const sd = [];
+    const n = []; // how many normal years have a value in this period
     for (const p of range(PERIODS)) {
       const vals = normalYears.map((y) => normals[y][k][p]).filter((v) => v != null);
+      n.push(vals.length);
       if (vals.length >= MIN_NORMAL_YEARS) {
         const s = meanAndSd(vals);
         mean.push(s.mean);
@@ -221,7 +223,7 @@ export function analyseField(field, rows) {
     const values = current.map((r) => r?.[k] ?? null);
     // z-score: how many standard deviations above (+) or below (−) normal.
     const z = values.map((v, p) => (v == null || mean[p] == null ? null : (v - mean[p]) / sd[p]));
-    result[k] = { values, mean, sd, z, level: z.map((_, p) => indexLevel(z, p)) };
+    result[k] = { values, mean, sd, n, z, level: z.map((_, p) => indexLevel(z, p)) };
   }
 
   // Growing season from the field's own normal NDVI curve.
@@ -256,6 +258,74 @@ function mostTypicalYear(result) {
     if (n > 0 && sum / n < bestError) { bestError = sum / n; best = y; }
   }
   return best;
+}
+
+/* ---------- Whole-season summary (for the results page) ---------- */
+
+/**
+ * Key numbers of a whole season:
+ *  warningStart  first period of the warning that led to the first red (or the first yellow)
+ *  firstRed      first red period
+ *  lead          early-warning lead time (see leadTime)
+ *  lowestNdmi / lowestNdvi   most negative z-score in the growing season and when
+ *  redPeriods    how many periods were red
+ */
+export function seasonSummary(result) {
+  const inSeason = result.dataPeriods.filter((p) => result.inSeason[p]);
+  const isWarning = (p) => result.overall[p] === 'yellow' || result.overall[p] === 'red';
+  const firstRed = inSeason.find((p) => result.overall[p] === 'red') ?? null;
+  const firstWarning = inSeason.find(isWarning) ?? null;
+  const lowest = (key) => {
+    let best = null;
+    for (const p of inSeason) {
+      const z = result[key].z[p];
+      if (z != null && (best == null || z < best.z)) best = { z, period: p };
+    }
+    return best;
+  };
+  const worst = inSeason.some((p) => result.overall[p] === 'red') ? 'red' : firstWarning != null ? 'yellow' : 'green';
+  return {
+    worst,
+    firstRed,
+    warningStart: firstRed != null ? warningSince(result, firstRed) : firstWarning,
+    lead: leadTime(result, PERIODS - 1),
+    lowestNdmi: lowest('ndmi'),
+    lowestNdvi: lowest('ndvi'),
+    redPeriods: inSeason.filter((p) => result.overall[p] === 'red').length,
+    pictures: inSeason.length,
+  };
+}
+
+/* ---------- How sure is the result? ---------- */
+
+/** Rules for the confidence label (all in one place so they are easy to explain). */
+export const CONFIDENCE = {
+  goodNormalYears: 5,   // 5+ normal years: "normal" is well known
+  maxGapDays: 20,       // previous picture at most 20 days earlier (needed for "2 in a row")
+  nearLimit: 0.25,      // within 0.25 SD of the −1 or −2 limit = close call
+};
+
+/**
+ * Confidence of the result in period p: 'high', 'medium' or 'low', with the reasons.
+ *  - low:    only the minimum of normal years, or no picture in the 30 days before
+ *  - high:   5+ normal years, a recent previous picture and not a close call
+ *  - medium: everything in between
+ */
+export function confidence(result, p) {
+  if (p == null || result.overall[p] == null) return null;
+  const counts = INDICES.map((k) => result[k].n[p]).filter((c) => c > 0);
+  const normalYears = counts.length ? Math.min(...counts) : 0;
+  const previous = result.dataPeriods.filter((q) => q < p).at(-1);
+  const gapDays = previous == null ? null : Math.round((result.dates[p] - result.dates[previous]) / 86400000);
+  const zs = INDICES.map((k) => result[k].z[p]).filter((z) => z != null);
+  const nearLimit = result.inSeason[p] && zs.some((z) => [YELLOW_Z, RED_Z].some((lim) => Math.abs(z - lim) < CONFIDENCE.nearLimit));
+
+  const fewYears = normalYears <= MIN_NORMAL_YEARS;
+  const longGap = gapDays == null || gapDays > 30;
+  let level = 'medium';
+  if (fewYears || longGap) level = 'low';
+  else if (normalYears >= CONFIDENCE.goodNormalYears && gapDays <= CONFIDENCE.maxGapDays && !nearLimit) level = 'high';
+  return { level, normalYears, gapDays, nearLimit };
 }
 
 /**
