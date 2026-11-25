@@ -1,0 +1,67 @@
+{
+  "fields": [
+    {
+      "id": "de-uelzen",
+      "name": {
+        "en": "Wheat field near Uelzen, northern Germany",
+        "de": "Weizenfeld bei Uelzen, Norddeutschland"
+      },
+      "short": {
+        "en": "Uelzen, Germany · 2018",
+        "de": "Uelzen, Deutschland · 2018"
+      },
+      "crop": "winter_wheat",
+      "lat": 52.95,
+      "lon": 10.626,
+      "areaHa": 20,
+      "polygon": [[52.9482, 10.62227], [52.9518, 10.62227], [52.9518, 10.62973], [52.9482, 10.62973]],
+      "file": "de-uelzen.csv",
+      "season": 2018,
+      "seasonStartMonth": 1,
+      "normalYears": [2016, 2017, 2019, 2020, 2021],
+      "simulated": true
+    },
+    {
+      "id": "it-mantova",
+      "name": {
+        "en": "Maize field near Mantua, Po Valley, Italy",
+        "de": "Maisfeld bei Mantua, Poebene, Italien"
+      },
+      "short": {
+        "en": "Po Valley, Italy · 2022",
+        "de": "Poebene, Italien · 2022"
+      },
+      "crop": "maize",
+      "lat": 45.1224,
+      "lon": 10.6757,
+      "areaHa": 12,
+      "polygon": [[45.12105, 10.67315], [45.12375, 10.67315], [45.12375, 10.67825], [45.12105, 10.67825]],
+      "file": "it-mantova.csv",
+      "season": 2022,
+      "seasonStartMonth": 1,
+      "normalYears": [2017, 2018, 2019, 2020, 2021],
+      "simulated": true
+    },
+    {
+      "id": "us-illinois",
+      "name": {
+        "en": "Maize field in central Illinois, US Midwest",
+        "de": "Maisfeld im Zentrum von Illinois, Mittlerer Westen der USA"
+      },
+      "short": {
+        "en": "Illinois, USA · 2023",
+        "de": "Illinois, USA · 2023"
+      },
+      "crop": "maize",
+      "lat": 40.18,
+      "lon": -88.4535,
+      "areaHa": 64,
+      "polygon": [[40.1764, -88.4582], [40.1836, -88.4582], [40.1836, -88.4488], [40.1764, -88.4488]],
+      "file": "us-illinois.csv",
+      "season": 2023,
+      "seasonStartMonth": 1,
+      "normalYears": [2018, 2019, 2020, 2021, 2022],
+      "simulated": true
+    }
+  ]
+}

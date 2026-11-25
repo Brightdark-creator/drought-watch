@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drought Watch</title>
+  <meta name="description" content="Free drought early warning for crop fields from Sentinel-2 satellite data.">
+  <meta name="theme-color" content="#1f6f50">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%231f6f50'/%3E%3Cpath d='M9 22c0-8 6-13 14-13 0 8-5 14-13 14' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Chart.js draws the line charts. Leaflet (the map) is loaded later by js/map.js, and never in light mode. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#1f6f50"/><path d="M9 22c0-8 6-13 14-13 0 8-5 14-13 14" fill="#fff"/></svg>
+      <div>
+        <h1 data-i18n="appTitle">Drought Watch</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
+    </div>
+    <div class="settings">
+      <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
+      <select id="lang"></select>
+      <button id="light-toggle" type="button" class="toggle" aria-pressed="false" data-i18n-title="lightModeHint">
+        <span data-i18n="lightMode">Light mode</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <form id="search" class="search" role="search">
+      <label class="visually-hidden" for="search-input" data-i18n="searchLabel"></label>
+      <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder">
+      <button type="submit" data-i18n="searchButton">Search</button>
+    </form>
+
+    <!-- 1. Map -->
+    <div id="map" class="map" role="region" data-i18n-aria-label="mapLabel"></div>
+
+    <div class="chips-row">
+      <span class="chips-label" data-i18n="testFields"></span>
+      <div id="chips" class="chips"></div>
+    </div>
+
+    <p id="message" class="message" role="status" hidden></p>
+
+    <!-- 2. Warning card -->
+    <section id="card" class="card" aria-live="polite"></section>
+
+    <!-- 3. Charts -->
+    <section id="details" class="details" hidden>
+      <div class="controls">
+        <div class="replay">
+          <label id="period-label" for="period-slider"></label>
+          <input id="period-slider" type="range" step="1">
+          <p class="hint" data-i18n="replayHint"></p>
+        </div>
+        <div class="compare">
+          <label class="check">
+            <input id="compare-toggle" type="checkbox">
+            <span data-i18n="compareToggle"></span>
+          </label>
+          <label id="compare-year-label" class="visually-hidden" for="compare-year" data-i18n="compareYear" hidden></label>
+          <select id="compare-year" hidden></select>
+        </div>
+      </div>
+
+      <figure class="chart-box">
+        <figcaption data-i18n="ndmiName"></figcaption>
+        <div class="chart-wrap"><canvas id="chart-ndmi" role="img"></canvas></div>
+      </figure>
+      <figure class="chart-box">
+        <figcaption data-i18n="ndviName"></figcaption>
+        <div class="chart-wrap"><canvas id="chart-ndvi" role="img"></canvas></div>
+      </figure>
+      <ul id="legend" class="legend"></ul>
+    </section>
+
+    <details class="explain">
+      <summary data-i18n="howTitle"></summary>
+      <p data-i18n="how1"></p>
+      <p data-i18n="how2"></p>
+      <p data-i18n="how3"></p>
+      <p data-i18n="how4"></p>
+    </details>
+  </main>
+
+  <footer class="footer">
+    <p data-i18n="footerSample"></p>
+    <p data-i18n="footerCredits"></p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,246 @@
+/* style.css — clean, light design that also reads well outdoors in sunlight.
+   Mobile first: the base rules are for phones, the @media rule at the end
+   adds more space on bigger screens. */
+
+:root {
+  --bg: #f4f6f4;
+  --surface: #ffffff;
+  --text: #1c2321;
+  --muted: #5b6662;
+  --border: #dde3df;
+  --accent: #1f6f50;
+
+  /* Traffic light. Yellow uses dark text, the others white, for contrast. */
+  --green: #1a7f37;
+  --yellow: #f2b705;
+  --yellow-text: #4d3800;
+  --red: #c62828;
+  --off: #8a9490;
+
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+button, select, input { font: inherit; color: inherit; }
+
+/* ---------- Header ---------- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; gap: 10px; align-items: center; }
+.logo { width: 34px; height: 34px; flex: none; }
+.brand h1 { margin: 0; font-size: 1.2rem; line-height: 1.2; }
+.tagline { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.settings { display: flex; gap: 8px; align-items: center; }
+
+select, .toggle, .search button, .chip {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Layout ---------- */
+main { max-width: 960px; margin: 0 auto; padding: 12px 16px 24px; }
+
+.search { display: flex; gap: 8px; margin-bottom: 12px; }
+.search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.search button { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.map {
+  height: 30vh;
+  min-height: 200px;
+  max-height: 440px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #e6ebe8;
+}
+.map[hidden] { display: none; }
+
+/* Field pins on the map */
+.pin-wrap { background: none; border: none; }
+.pin {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  background: var(--off);
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+}
+.pin-green { background: var(--green); }
+.pin-yellow { background: var(--yellow); color: var(--yellow-text); }
+.pin-red { background: var(--red); }
+.pin-selected { outline: 3px solid var(--text); }
+
+/* Test field buttons */
+.chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.chips-label { color: var(--muted); font-size: 0.9rem; }
+.chips-row { flex-wrap: nowrap; }
+/* On phones the buttons sit in one row that scrolls sideways, so the warning stays near the top. */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
+.chip { flex: none; }
+.chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 4px 14px 4px 4px; }
+.chip.selected { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.chip-symbol, .mini {
+  display: inline-grid;
+  place-items: center;
+  width: 28px; height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--off);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+.mini { width: 22px; height: 22px; font-size: 13px; }
+.lvl-green { background: var(--green); }
+.lvl-yellow { background: var(--yellow); color: var(--yellow-text); }
+.lvl-red { background: var(--red); }
+
+.message {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff8e1;
+  border: 1px solid #f0dd9c;
+}
+.link-button { border: none; background: none; padding: 0; color: var(--accent); font-weight: 700; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Warning card ---------- */
+.card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  margin: 0 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 10px solid var(--off);
+  border-radius: var(--radius);
+}
+.badge {
+  display: grid;
+  place-items: center;
+  width: 54px; height: 54px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--off);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 800;
+}
+.card.green { border-left-color: var(--green); }
+.card.green .badge { background: var(--green); }
+.card.yellow { border-left-color: var(--yellow); }
+.card.yellow .badge { background: var(--yellow); color: var(--yellow-text); }
+.card.red { border-left-color: var(--red); }
+.card.red .badge { background: var(--red); }
+
+.card-body { min-width: 0; }
+.field-name { margin: 0 0 2px; color: var(--muted); font-size: 0.85rem; }
+.level { margin: 0; font-size: 1.6rem; line-height: 1.2; }
+.advice { margin: 4px 0 10px; font-size: 1.05rem; }
+.indices { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.indices li { display: flex; gap: 8px; align-items: center; }
+.z { color: var(--muted); white-space: nowrap; cursor: help; }
+.meta { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+/* ---------- Charts ---------- */
+.details[hidden] { display: none; }
+.controls {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.replay label { font-weight: 700; }
+.replay input { width: 100%; margin: 8px 0 2px; accent-color: var(--accent); }
+.hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.compare { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.chart-box {
+  margin: 0 0 12px;
+  padding: 12px 12px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.chart-box figcaption { font-weight: 700; margin: 0 4px 6px; }
+.chart-wrap { position: relative; height: 210px; }
+
+.legend { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.legend .shapes { flex-basis: 100%; }
+.key { display: inline-block; width: 22px; height: 0; border-top: 3px solid #1c2321; }
+.key-band { height: 12px; border: none; background: rgba(110, 120, 116, 0.3); border-radius: 2px; }
+.key-mean { border-top: 2px dashed #6e7874; }
+.key-compare { border-top-color: #2563eb; }
+
+/* ---------- Explanation and footer ---------- */
+.explain {
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.explain summary { font-weight: 700; cursor: pointer; }
+.explain p { margin: 10px 0 0; max-width: 70ch; }
+.footer { max-width: 960px; margin: 0 auto; padding: 0 16px 24px; color: var(--muted); font-size: 0.8rem; }
+.footer p { margin: 4px 0; }
+
+/* ---------- Bigger screens ---------- */
+@media (min-width: 720px) {
+  main { padding-top: 16px; }
+  .map { height: 42vh; min-height: 240px; }
+  .chips { flex-wrap: wrap; overflow: visible; }
+  .card { padding: 20px 24px; gap: 20px; }
+  .badge { width: 84px; height: 84px; font-size: 46px; }
+  .level { font-size: 2rem; }
+  .controls { grid-template-columns: 2fr 1fr; align-items: start; }
+  .chart-wrap { height: 240px; }
+}
