@@ -84,7 +84,7 @@ const pos = (z) => ((Math.min(METER_MAX, Math.max(METER_MIN, z)) - METER_MIN) / 
 export function meterHtml({ z, level, inSeason, head, ariaLabel, formatTick }) {
   const red = pos(RED_Z);
   const yellow = pos(YELLOW_Z);
-  const marker = z == null ? '' : `<span class="marker lvl-${inSeason && level ? level : 'off'}${z < METER_MIN ? ' clipped' : ''}" style="left:${pos(z)}%"></span>`;
+  const marker = z == null ? '' : `<span class="marker lvl-${inSeason && level ? level : 'off'}${z < METER_MIN ? ' clipped' : ''}" style="left:${pos(z)}%;--zero:${pos(0)}%"></span>`;
   return `<div class="meter-row">
     <div class="meter-head">${head}</div>
     <div class="meter${inSeason ? '' : ' meter-off'}" role="img" aria-label="${ariaLabel}">
@@ -113,7 +113,7 @@ export function timelineHtml(a, selected, monthLabel) {
     if (selected != null && p > selected) classes.push('future');
     if (p === selected) classes.push('current');
     const symbol = level === 'yellow' || level === 'red' ? SYMBOLS[level] : '';
-    return `<span class="${classes.join(' ')}" data-p="${p}"><i>${symbol}</i></span>`;
+    return `<span class="${classes.join(' ')}" data-p="${p}" style="--i:${p}"><i>${symbol}</i></span>`;
   }).join('');
   const months = a.labels
     .map((d, p) => (p % 3 === 0 ? `<span style="grid-column:${p + 1} / span 3">${monthLabel(d)}</span>` : ''))

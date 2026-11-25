@@ -9,7 +9,7 @@
 
 const C = {
   season: '#1c2321', band: 'rgba(110,120,116,0.22)', mean: '#6e7874', compare: '#2563eb',
-  grid: 'rgba(0,0,0,0.07)', text: '#59645f', selected: '#1f6f50', off: 'rgba(28,35,33,0.045)',
+  grid: 'rgba(0,0,0,0.07)', text: '#59645f', selected: '#12251c', off: 'rgba(28,35,33,0.045)',
 };
 const LEVEL = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828', off: '#a3aca8', unknown: '#a3aca8' };
 

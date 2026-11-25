@@ -16,7 +16,7 @@ const COLORS = {
   mean: '#6e7874',
   compare: '#2563eb',
   grid: 'rgba(0, 0, 0, 0.07)',
-  selected: '#1f6f50',
+  selected: '#12251c',
   offSeason: 'rgba(28, 35, 33, 0.045)',
 };
 
@@ -156,6 +156,9 @@ export class IndexChart {
     const pad = (max - min) * 0.08 || 0.05;
 
     const sd = d.sd;
+    const step = max + pad - (min - pad) > 0.4 ? 0.2 : 0.1; // 3 to 6 labels
+    const yMin = Math.floor((min - pad) / step + 1e-9) * step;
+    const yMax = Math.ceil((max + pad) / step - 1e-9) * step;
     const options = {
       responsive: true,
       maintainAspectRatio: false,
@@ -177,11 +180,15 @@ export class IndexChart {
       },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } },
-        y: { min: min - pad, max: max + pad, grid: { color: COLORS.grid }, ticks: { maxTicksLimit: 5, callback: (v) => d.format(v, 1) } },
+        // Ends rounded to the tick step so every tick is a round number (no "0.4 / 0.4" at the top)
+        y: { min: yMin, max: yMax, grid: { color: COLORS.grid }, ticks: { stepSize: step, callback: (v) => d.format(v, 1) } },
       },
     };
 
     if (!this.chart) {
+      // Same font as the page (Archivo), a readable size and the page's muted ink
+      Object.assign(window.Chart.defaults.font, { family: getComputedStyle(document.body).fontFamily, size: 12 });
+      window.Chart.defaults.color = '#4c5b53';
       this.chart = new window.Chart(this.canvas, { type: 'line', data: { labels: d.labels, datasets }, options, plugins: [selectedLine] });
     } else {
       this.chart.data.labels = d.labels;

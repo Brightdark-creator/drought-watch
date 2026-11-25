@@ -143,6 +143,22 @@ async function selectField(id) {
   state.period = startPeriod(field, a);
   state.compareYear = a.typicalYear;
   renderSelected(a);
+  playEntrance();
+}
+
+/**
+ * The page's one orchestrated moment, only when a field opens (not on every
+ * slider move): the card rises, the meter needles sweep from "normal" to the
+ * field's value and the season bars grow left to right. CSS turns it off for
+ * people who ask for reduced motion.
+ */
+function playEntrance() {
+  const parts = [$('card'), $('timeline')];
+  parts.forEach((el) => el.classList.remove('is-entering'));
+  void $('card').offsetWidth; // restart the animation when the same class comes back
+  parts.forEach((el) => el.classList.add('is-entering'));
+  clearTimeout(playEntrance.timer);
+  playEntrance.timer = setTimeout(() => parts.forEach((el) => el.classList.remove('is-entering')), 1400);
 }
 
 /** A point on the map or a search result: select the field there, if we have one. */
@@ -217,7 +233,12 @@ async function renderCard({ loading = false } = {}) {
           <h2 class="level">${esc(loading ? t('loading') : t('chooseTitle'))}</h2>
           ${loading ? '' : `<p class="advice">${esc(t('chooseText'))}</p>`}
         </div>
-      </div>`;
+      </div>
+      ${loading ? '' : `
+      <ol class="start-steps">
+        ${[1, 2, 3].map((n) => `<li><b>${esc(t(`step${n}Title`))}</b><span>${esc(t(`step${n}Text`))}</span></li>`).join('')}
+      </ol>
+      <p class="start-fact">${esc(t('chooseFact'))} <a href="summary.html">${esc(t('chooseFactLink'))}</a></p>`}`;
     return;
   }
   const a = await analysisFor(field);
@@ -473,13 +494,13 @@ function renderLightToggle() {
   if (!state.light) loadFont();
 }
 
-/** The Manrope font makes the page nicer, but it is a download: never in light mode. */
+/** The Archivo font (its wide cut sets the headings, like place names on a map) is a download: never in light mode. */
 function loadFont() {
   if (document.getElementById('font-css')) return;
   const link = document.createElement('link');
   link.id = 'font-css';
   link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&display=swap';
   document.head.appendChild(link);
 }
 
