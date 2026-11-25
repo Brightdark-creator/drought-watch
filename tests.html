@@ -27,8 +27,8 @@
   <ul id="results"></ul>
 </main>
 <script type="module">
-  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, SD_FLOOR } from './js/analysis.js';
-  import { parseCsv, distanceKm } from './js/data.js';
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, SD_FLOOR } from './js/analysis.js';
+  import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError } from './js/data.js';
 
   const results = [];
   function check(name, condition, detail = '') {
@@ -166,6 +166,30 @@
   check('CSV: reads Earth Engine files with extra and quoted columns', parsed.length === 2);
   check('CSV: sorts by date and reads values', parsed[0].ndvi === 0.62 && parsed[1].ndmi === 0.33);
   check('CSV: an empty value becomes "no value" (not 0)', parsed[0].ndmi === null);
+
+  /* ---------- Your own file ---------- */
+  const pointCsv = 'date,NDVI,NDMI,.geo\n2018-05-03,0.8,0.3,"{""type"":""Point"",""coordinates"":[10.5,52.9]}"\n';
+  const pos = readLocation(pointCsv);
+  check('Position from an Earth Engine Point (.geo is lon, lat)', pos.lat === 52.9 && pos.lon === 10.5);
+  const polyCsv = 'date,NDVI,NDMI,.geo\n2018-05-03,0.8,0.3,"{""type"":""Polygon"",""coordinates"":[[[10,50],[12,50],[12,52],[10,52],[10,50]]]}"\n';
+  const poly = readLocation(polyCsv);
+  check('Position from a Polygon: centre of the outline, outline turned into [lat, lon]', poly.lat === 51 && poly.lon === 11 && poly.polygon[1][0] === 50 && poly.polygon[1][1] === 12);
+  const ll = readLocation('date,lat,lon,NDVI,NDMI\n2018-05-03,45.1,10.7,0.8,0.3\n');
+  check('Position from lat/lon columns', ll.lat === 45.1 && ll.lon === 10.7);
+  check('A file without a position gives no position (no crash)', Object.keys(readLocation('date,NDVI,NDMI\n2018-05-03,0.8,0.3\n')).length === 0);
+  const seasonsJan = availableSeasons(rows);
+  check('Available seasons: the 5 normal years + 2020, each with 36 periods', seasonsJan.length === 6 && seasonsJan.every((s) => s.periods === 36 && s.usable));
+  const seasonsJuly = availableSeasons(rows, 7);
+  check('Season starting in July: one more (half) season appears, e.g. 2009/10', seasonsJuly[0].season === 2009 && seasonsJuly[0].periods === 18);
+  let uploadError = null;
+  try { await readUploadedFile(new File(['date,NDVI\n2020-01-01,0.5\n'], 'x.csv')); } catch (e) { uploadError = e; }
+  check('Uploading a file without NDMI gives a clear "columns" error', uploadError instanceof DataError && uploadError.code === 'columns');
+  uploadError = null;
+  try { await readUploadedFile(new File(['date,NDVI,NDMI\n2020-01-01,0.5,0.2\n'], 'x.csv')); } catch (e) { uploadError = e; }
+  check('Uploading a file with too few pictures gives a "tooFew" error', uploadError?.code === 'tooFew' && uploadError.params.n === 1);
+  const csvText = 'date,NDVI,NDMI\n' + rows.map((r) => `${r.date.toISOString().slice(0, 10)},${r.ndvi},${r.ndmi}`).join('\n');
+  const up = await readUploadedFile(new File([csvText], 'my field.csv'));
+  check('A good upload becomes a field named after the file, with all its pictures', up.field.uploaded && up.field.name.en === 'my field' && up.rows.length === rows.length);
 
   /* ---------- Distance ---------- */
   check('Distance Berlin–Munich is about 504 km', Math.abs(distanceKm(52.52, 13.405, 48.137, 11.575) - 504) < 5);

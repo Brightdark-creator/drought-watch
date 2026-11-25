@@ -51,10 +51,37 @@
       <div id="chips" class="chips"></div>
     </div>
 
+    <!-- Your own Earth Engine file: picked with the button or dropped anywhere on the page -->
+    <div class="upload-row">
+      <label class="upload-button">
+        <input id="upload-input" type="file" accept=".csv,.json,text/csv,application/json" class="visually-hidden">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span data-i18n="uploadButton"></span>
+      </label>
+      <span class="hint" data-i18n="uploadHint"></span>
+    </div>
+
     <p id="message" class="message" role="status" hidden></p>
 
     <!-- 2. Warning card -->
     <section id="card" class="card" aria-live="polite"></section>
+
+    <!-- Settings for an uploaded file (season, normal years) -->
+    <section id="upload-settings" class="panel upload-panel" hidden>
+      <h3 data-i18n="uploadSettings"></h3>
+      <div class="upload-grid">
+        <label><span data-i18n="seasonStart"></span><select id="up-start"></select></label>
+        <label><span data-i18n="seasonYear"></span><select id="up-season"></select></label>
+      </div>
+      <fieldset>
+        <legend data-i18n="normalYearsLabel"></legend>
+        <div id="up-normals" class="year-boxes"></div>
+      </fieldset>
+      <div class="upload-actions">
+        <span class="hint" data-i18n="uploadPrivacy"></span>
+        <button id="up-remove" type="button" class="toggle" data-i18n="removeUpload"></button>
+      </div>
+    </section>
 
     <!-- 3. Charts -->
     <section id="details" class="details" hidden>
@@ -102,6 +129,8 @@
       <p data-i18n="how4"></p>
     </details>
   </main>
+
+  <div id="drop-overlay" class="drop-overlay" hidden aria-hidden="true"><p data-i18n="dropHere"></p></div>
 
   <footer class="footer">
     <p><a href="summary.html" data-i18n="summaryLink"></a> · <a href="tests.html">Tests</a></p>

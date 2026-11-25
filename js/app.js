@@ -7,7 +7,7 @@
  *   i18n.js / lang.js  all texts, dates and numbers
  */
 import * as Data from './data.js';
-import { analyseField, warningSince, leadTime, confidence, SYMBOLS } from './analysis.js';
+import { analyseField, availableSeasons, checkNormalYears, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
 import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
   t, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
@@ -115,7 +115,8 @@ async function selectField(id) {
   renderChips();
   renderCard({ loading: true });
   if (!state.light) MapView.focusField(field);
-  history.replaceState(null, '', `?field=${encodeURIComponent(id)}`);
+  // Shareable link for test fields; an uploaded file only exists on this device.
+  history.replaceState(null, '', field.uploaded ? location.pathname : `?field=${encodeURIComponent(id)}`);
 
   let a;
   try {
@@ -174,6 +175,7 @@ async function onSearch(event) {
 /* ---------- Drawing the screen ---------- */
 function renderSelected(a) {
   $('details').hidden = false;
+  renderUploadSettings(a);
   renderSlider(a);
   renderTimeline(a);
   renderCompare(a);
@@ -230,7 +232,9 @@ async function renderCard({ loading = false } = {}) {
   const crop = t(`crop_${field.crop}`);
   const meta = [
     `<b>${esc(pick(field.name))}</b>`,
-    `${esc(crop.startsWith('crop_') ? t('crop_unknown') : crop)}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
+    field.uploaded
+      ? `<em>${esc(t('fromYourFile'))}</em>`
+      : `${esc(crop.startsWith('crop_') ? t('crop_unknown') : crop)}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
   ];
   const facts = [
     p != null && a.dates[p] ? t('imageDate', { date: formatDate(a.dates[p]) }) : null,
@@ -443,6 +447,102 @@ async function setLightMode(on, { save = true } = {}) {
   if (currentField()) rerender(); // switch between the light and the full chart
 }
 
+/* ---------- Your own file (upload or drag-and-drop) ---------- */
+
+/** Read a file the user picked or dropped, add it as a field and show it. */
+async function onUpload(file) {
+  if (!file) return;
+  showMessage(t('uploadReading', { name: file.name }));
+  let field;
+  try {
+    ({ field } = await Data.readUploadedFile(file));
+  } catch (error) {
+    console.error(error);
+    const code = error instanceof Data.DataError ? error.code : 'unreadable';
+    showMessage(t(`upload_${code}`, { name: file.name, ...(error.params || {}) }));
+    return;
+  }
+  hideMessage();
+  state.fields.push(field);
+  renderChips();
+  if (!state.light) MapView.addField(field, (f) => pick(f.name));
+  await selectField(field.id);
+  const a = await analysisFor(field);
+  updateFieldLevel(field.id, a);
+  if (a.normalYears.length < MIN_NORMAL_YEARS) showMessage(t('uploadFewNormals', { n: a.normalYears.length }));
+  else if (!Number.isFinite(field.lat)) showMessage(t('uploadNoPlace'));
+}
+
+/** Season start, season and normal-year choices for an uploaded file. */
+async function renderUploadSettings(a) {
+  const field = currentField();
+  const panel = $('upload-settings');
+  panel.hidden = !field?.uploaded;
+  if (!field?.uploaded) return;
+  const start = field.seasonStartMonth || 1;
+  $('up-start').innerHTML = Array.from({ length: 12 }, (_, i) => i + 1)
+    .map((m) => `<option value="${m}"${m === start ? ' selected' : ''}>${esc(formatDate(new Date(Date.UTC(2000, m - 1, 1)), { month: 'long' }))}</option>`)
+    .join('');
+  const seasons = availableSeasons(await Data.loadSeries(field), start);
+  const label = (s) => (start === 1 ? String(s) : `${s}/${String(s + 1).slice(2)}`); // e.g. 2022/23
+  $('up-season').innerHTML = seasons
+    .map((s) => `<option value="${s.season}"${s.season === a.season ? ' selected' : ''}>${esc(label(s.season))}</option>`)
+    .join('');
+  // Mark normal years that look dry compared with the other normal years.
+  const looksDry = new Set(checkNormalYears(a).filter((c) => c.suspicious).map((c) => c.year));
+  $('up-normals').innerHTML = seasons.filter((s) => s.season !== a.season).map((s) => {
+    const checked = s.usable && a.normalYears.includes(s.season);
+    const note = !s.usable ? t('tooFewPictures') : looksDry.has(s.season) ? t('looksDry') : '';
+    return `<label class="${s.usable ? '' : 'disabled'}${looksDry.has(s.season) ? ' dry' : ''}">
+      <input type="checkbox" value="${s.season}"${checked ? ' checked' : ''}${s.usable ? '' : ' disabled'}>
+      ${looksDry.has(s.season) ? '<span class="mini lvl-yellow" aria-hidden="true">!</span>' : ''}
+      ${esc(label(s.season))}${note ? ` <small>(${esc(note)})</small>` : ''}
+    </label>`;
+  }).join('');
+}
+
+/** Apply new settings to the uploaded file and analyse it again. */
+function changeUploadSettings(change) {
+  const field = currentField();
+  if (!field?.uploaded) return;
+  Object.assign(field, change);
+  state.analyses.delete(field.id);
+  selectField(field.id).then(() => analysisFor(field).then((a) => updateFieldLevel(field.id, a)));
+}
+
+function removeUpload() {
+  const field = currentField();
+  if (!field?.uploaded) return;
+  state.fields = state.fields.filter((f) => f.id !== field.id);
+  state.analyses.delete(field.id);
+  Data.removeUploadedField(field.id);
+  MapView.removeField(field.id);
+  state.selectedId = null;
+  state.period = null;
+  $('details').hidden = true;
+  $('upload-settings').hidden = true;
+  history.replaceState(null, '', location.pathname);
+  renderChips();
+  renderCard();
+}
+
+/** Drag a file anywhere over the page: show a big drop area. */
+function wireDragAndDrop() {
+  const overlay = $('drop-overlay');
+  const hasFile = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  let depth = 0; // dragenter/dragleave fire for every child element
+  window.addEventListener('dragenter', (e) => { if (hasFile(e)) { depth++; overlay.hidden = false; } });
+  window.addEventListener('dragleave', (e) => { if (hasFile(e) && --depth <= 0) { depth = 0; overlay.hidden = true; } });
+  window.addEventListener('dragover', (e) => { if (hasFile(e)) e.preventDefault(); }); // allow dropping
+  window.addEventListener('drop', (e) => {
+    if (!hasFile(e)) return;
+    e.preventDefault(); // otherwise the browser would open the file
+    depth = 0;
+    overlay.hidden = true;
+    onUpload(e.dataTransfer.files[0]);
+  });
+}
+
 /* ---------- "Use my location" ---------- */
 function onLocate() {
   if (!navigator.geolocation) { showMessage(t('locateError')); return; }
@@ -496,6 +596,17 @@ function wireControls() {
     rerender();
   });
   $('locate').addEventListener('click', onLocate);
+  $('upload-input').addEventListener('change', (e) => {
+    onUpload(e.target.files[0]);
+    e.target.value = ''; // so the same file can be picked again
+  });
+  wireDragAndDrop();
+  $('up-start').addEventListener('change', (e) => changeUploadSettings({ seasonStartMonth: Number(e.target.value), season: undefined, normalYears: undefined }));
+  $('up-season').addEventListener('change', (e) => changeUploadSettings({ season: Number(e.target.value), normalYears: undefined }));
+  $('up-normals').addEventListener('change', () => changeUploadSettings({
+    normalYears: [...$('up-normals').querySelectorAll('input:checked')].map((i) => Number(i.value)),
+  }));
+  $('up-remove').addEventListener('click', removeUpload);
   // Click a bar of the season timeline to jump to that date.
   $('timeline').addEventListener('click', async (e) => {
     const bar = e.target.closest('.bar');

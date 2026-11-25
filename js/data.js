@@ -13,6 +13,7 @@
  *   listFields()            -> Promise<Field[]>
  *   loadSeries(field)       -> Promise<[{ date: Date, ndvi: number|null, ndmi: number|null }]>
  *   findField(fields, lat, lon) -> Promise<{ field, km, exact }|null>
+ *   readUploadedFile(file)  -> Promise<{ field, rows }>   (a CSV/JSON the user picked)
  *
  * Example for a backend later:
  *   loadSeries = (field) => fetch(`https://my-api/series?lat=${field.lat}&lon=${field.lon}`)...
@@ -33,8 +34,92 @@ export async function listFields() {
 
 const seriesCache = new Map(); // field id -> Promise (each file is loaded only once)
 
+/** An error the app can translate: code = 'columns' | 'tooFew' | 'unreadable'. */
+export class DataError extends Error {
+  constructor(code, params = {}) {
+    super(code);
+    this.code = code;
+    this.params = params;
+  }
+}
+
+/* ---------- Files the user uploads ---------- */
+
+const uploads = new Map(); // field id -> rows (kept in memory only, never sent anywhere)
+let uploadCount = 0;
+
+/** A file needs at least this many pictures: several years of a few pictures each. */
+export const MIN_UPLOAD_ROWS = 30;
+
+/**
+ * Read a CSV or JSON file the user picked or dropped on the page.
+ * The file is read in the browser and never leaves the device.
+ * Returns a new field object (like the entries in fields.json) and its rows.
+ */
+export async function readUploadedFile(file) {
+  const text = await file.text();
+  const isJson = /\.json$/i.test(file.name) || text.trim().startsWith('[');
+  let rows;
+  try {
+    rows = isJson ? parseJsonRows(JSON.parse(text)) : parseCsv(text);
+  } catch (error) {
+    if (error instanceof DataError) throw error;
+    throw new DataError('unreadable');
+  }
+  if (rows.length < MIN_UPLOAD_ROWS) throw new DataError('tooFew', { n: rows.length });
+  const name = file.name.replace(/\.(csv|json)$/i, '');
+  const field = {
+    id: `upload-${++uploadCount}`,
+    uploaded: true,
+    name: { en: name },
+    short: { en: name },
+    ...(isJson ? {} : readLocation(text)), // lat, lon, polygon if the file has them
+  };
+  uploads.set(field.id, rows);
+  return { field, rows };
+}
+
+export function removeUploadedField(id) {
+  uploads.delete(id);
+  seriesCache.delete(id);
+}
+
+/**
+ * Where is the field? Earth Engine CSVs have a ".geo" column with GeoJSON
+ * (a Point, or a Polygon for the field outline). Columns lat/lon also work.
+ * Returns { lat, lon, polygon? } or {} if the file has no position.
+ */
+export function readLocation(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const header = splitCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+  const first = lines[1] ? splitCsvLine(lines[1]) : [];
+  const geoCol = header.indexOf('.geo');
+  if (geoCol >= 0 && first[geoCol]) {
+    try {
+      const geo = JSON.parse(first[geoCol]);
+      if (geo.type === 'Point') return { lat: geo.coordinates[1], lon: geo.coordinates[0] };
+      const ring = geo.type === 'Polygon' ? geo.coordinates[0] : geo.type === 'MultiPolygon' ? geo.coordinates[0][0] : null;
+      if (ring) {
+        const pts = ring.slice(0, -1); // the last point repeats the first
+        const lat = pts.reduce((s, c) => s + c[1], 0) / pts.length;
+        const lon = pts.reduce((s, c) => s + c[0], 0) / pts.length;
+        return { lat, lon, polygon: ring.map((c) => [c[1], c[0]]) }; // Leaflet wants [lat, lon]
+      }
+    } catch { /* no usable position */ }
+  }
+  const latCol = header.findIndex((h) => h === 'lat' || h === 'latitude');
+  const lonCol = header.findIndex((h) => h === 'lon' || h === 'lng' || h === 'longitude');
+  if (latCol >= 0 && lonCol >= 0) {
+    const lat = parseFloat(first[latCol]);
+    const lon = parseFloat(first[lonCol]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+  }
+  return {};
+}
+
 /** Load all measurements of one field, sorted by date. */
 export function loadSeries(field) {
+  if (field.uploaded) return Promise.resolve(uploads.get(field.id) || []);
   if (!seriesCache.has(field.id)) {
     const promise = fetch(DATA_URL + field.file)
       .then((response) => {
@@ -56,7 +141,7 @@ export function loadSeries(field) {
  */
 export async function findField(fields, lat, lon) {
   let best = null;
-  for (const field of fields) {
+  for (const field of fields.filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lon))) {
     const km = distanceKm(lat, lon, field.lat, field.lon);
     if (!best || km < best.km) best = { field, km };
   }
@@ -85,7 +170,7 @@ export function parseCsv(text) {
   const header = splitCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
   const col = { date: header.indexOf('date'), ndvi: header.indexOf('ndvi'), ndmi: header.indexOf('ndmi') };
   if (col.date < 0 || col.ndvi < 0 || col.ndmi < 0) {
-    throw new Error('The CSV file needs the columns date, NDVI and NDMI');
+    throw new DataError('columns'); // the file needs the columns date, NDVI and NDMI
   }
   const rows = [];
   for (const line of lines.slice(1)) {

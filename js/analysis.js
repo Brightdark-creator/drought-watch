@@ -88,6 +88,19 @@ export function periodStart(season, period, startMonth = 1) {
   return new Date(Date.UTC(year, monthIndex % 12, day));
 }
 
+/**
+ * Which seasons does a file contain, and how many 10-day periods with a
+ * picture does each have? Used to offer the season and normal-year choices
+ * for an uploaded file. Returns [{ season, periods, usable }], oldest first.
+ */
+export function availableSeasons(rows, startMonth = 1) {
+  const seasons = composite(rows, startMonth);
+  return [...seasons.keys()].sort((a, b) => a - b).map((season) => {
+    const periods = seasons.get(season).filter(Boolean).length;
+    return { season, periods, usable: periods >= MIN_PERIODS_PER_YEAR };
+  });
+}
+
 /* ---------- Step 1: one value per 10-day period ("compositing") ---------- */
 
 /**

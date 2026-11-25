@@ -116,8 +116,9 @@ Open <http://localhost:8000/tests.html> while the local server runs. It checks
 the calendar, the average/SD/z-score, every part of the warning rule (yellow,
 red only twice in a row, cloudy gaps, SD minimum, too few normal years), the
 lead time, the season summary, the confidence label, the CSV reader and the
-distance formula, and the normal-year check, with small examples whose answers
-are known. All 43 should pass.
+distance formula, the normal-year check and reading uploaded files (position
+from `.geo`, clear errors), with small examples whose answers are known.
+All 52 should pass.
 
 ## Accessibility
 
@@ -162,6 +163,25 @@ Then open <http://localhost:8000>. Stop the server with Ctrl+C.
 All paths in the app are relative, so it works in a sub-folder like that.
 
 ## Use your own Earth Engine data
+
+### Quick: drop the file on the page
+
+Click **Analyse your own CSV** (or drag the file onto the page). The app reads
+it in the browser, so the file never leaves your device, and it is gone when
+you reload. Then use **Settings for your file**:
+
+- **Season starts in:** January for most of the northern hemisphere; e.g. July
+  for the southern hemisphere, where the season crosses New Year.
+- **Season to check:** the year to judge (default: the latest in the file).
+- **Normal years:** all other years with enough pictures are ticked. Years
+  that look dry compared with the others are marked "looks dry": untick them
+  if they were drought years. Years with too few pictures can't be used.
+
+If the CSV has Earth Engine's `.geo` column (a Point or the field Polygon) or
+`lat`/`lon` columns, the field also appears on the map. The file needs at
+least 30 pictures; the app explains what is wrong if a column is missing.
+
+### Permanent: add it to the test fields
 
 1. Export a CSV per field with your script. Required columns: `date`
    (`YYYY-MM-DD`), `NDVI`, `NDMI`. Extra columns (`year`, `system:index`,

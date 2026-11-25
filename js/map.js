@@ -114,21 +114,38 @@ function pinIcon(level, selected) {
 /** Draw all fields and zoom so that every field is visible. */
 export function showFields(fields, nameOf) {
   if (!map) return;
-  for (const field of fields) {
-    const marker = L.marker([field.lat, field.lon], { icon: pinIcon(null, false), title: nameOf(field), keyboard: true })
+  const located = fields.filter(hasPosition);
+  located.forEach((field) => addField(field, nameOf));
+  if (located.length) {
+    map.fitBounds(L.latLngBounds(located.map((f) => [f.lat, f.lon])), { padding: [40, 40], maxZoom: 6, animate: false });
+  }
+}
+
+const hasPosition = (f) => Number.isFinite(f.lat) && Number.isFinite(f.lon);
+
+/** Add one field (pin + outline). Fields without a position are skipped. */
+export function addField(field, nameOf) {
+  if (!map || !hasPosition(field) || pins.has(field.id)) return;
+  const marker = L.marker([field.lat, field.lon], { icon: pinIcon(null, false), title: nameOf(field), keyboard: true })
+    .addTo(map)
+    .on('click', () => handlers.onFieldClick?.(field.id));
+  let outline = null;
+  if (field.polygon) {
+    outline = L.polygon(field.polygon, { ...OUTLINE[baseName], bubblingMouseEvents: false })
       .addTo(map)
       .on('click', () => handlers.onFieldClick?.(field.id));
-    let outline = null;
-    if (field.polygon) {
-      outline = L.polygon(field.polygon, { ...OUTLINE[baseName], bubblingMouseEvents: false })
-        .addTo(map)
-        .on('click', () => handlers.onFieldClick?.(field.id));
-    }
-    pins.set(field.id, { marker, outline, level: null });
   }
-  if (fields.length) {
-    map.fitBounds(L.latLngBounds(fields.map((f) => [f.lat, f.lon])), { padding: [40, 40], maxZoom: 6, animate: false });
-  }
+  pins.set(field.id, { marker, outline, level: null });
+}
+
+/** Remove a field from the map (used when an uploaded file is removed). */
+export function removeField(id) {
+  const pin = pins.get(id);
+  if (!pin) return;
+  pin.marker.remove();
+  pin.outline?.remove();
+  pins.delete(id);
+  if (selectedId === id) selectedId = null;
 }
 
 /** Update a pin's colour and symbol after its data has been analysed. */
@@ -141,7 +158,7 @@ export function setFieldLevel(id, level) {
 
 /** Highlight the selected field and zoom to it. */
 export function focusField(field) {
-  if (!map) return;
+  if (!map || !hasPosition(field)) return;
   const previous = selectedId;
   selectedId = field.id;
   if (previous && pins.has(previous)) setFieldLevel(previous, pins.get(previous).level);
