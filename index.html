@@ -10,61 +10,77 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Drought Watch">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="css/style.css">
   <!-- Libraries are downloaded only when needed: Leaflet (map) by js/map.js and Chart.js by js/charts.js.
        Light mode needs neither, so it loads fast on slow internet. -->
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <img class="logo" src="icons/icon.svg" alt="" width="36" height="36">
-      <div>
-        <h1 data-i18n="appTitle">Drought Watch</h1>
-        <p class="tagline" data-i18n="tagline"></p>
+  <!-- Header: name, settings, search, areas, your own file -->
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-top">
+        <div class="brand">
+          <img class="logo" src="icons/icon.svg" alt="" width="40" height="40">
+          <div>
+            <h1 data-i18n="appTitle">Drought Watch</h1>
+            <p class="tagline" data-i18n="tagline"></p>
+          </div>
+        </div>
+        <div class="settings">
+          <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
+          <select id="lang"></select>
+          <button id="light-toggle" type="button" class="toggle" aria-pressed="false" data-i18n-title="lightModeHint">
+            <span data-i18n="lightMode">Light mode</span>
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="settings">
-      <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
-      <select id="lang"></select>
-      <button id="light-toggle" type="button" class="toggle" aria-pressed="false" data-i18n-title="lightModeHint">
-        <span data-i18n="lightMode">Light mode</span>
-      </button>
+
+      <form id="search" class="search" role="search">
+        <label class="visually-hidden" for="search-input" data-i18n="searchLabel"></label>
+        <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder">
+        <button type="button" id="locate" class="icon-button" data-i18n-aria-label="locate" data-i18n-title="locate">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button type="submit" data-i18n="searchButton">Search</button>
+      </form>
+
+      <div class="chips-row">
+        <span class="chips-label" data-i18n="testFields"></span>
+        <div id="chips" class="chips"></div>
+        <!-- Your own Earth Engine file: picked here or dropped anywhere on the page -->
+        <label class="upload-button" data-i18n-title="uploadHint" data-i18n-aria-label="uploadButton">
+          <input id="upload-input" type="file" accept=".csv,.json,text/csv,application/json" class="visually-hidden">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i18n="uploadButton"></span>
+        </label>
+      </div>
     </div>
   </header>
 
+  <!-- 1. Map (full width; the warning card overlaps its lower edge) -->
+  <div id="map" class="map" role="region" data-i18n-aria-label="mapLabel"></div>
+
   <main>
-    <form id="search" class="search" role="search">
-      <label class="visually-hidden" for="search-input" data-i18n="searchLabel"></label>
-      <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder">
-      <button type="button" id="locate" class="icon-button" data-i18n-aria-label="locate" data-i18n-title="locate">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <button type="submit" data-i18n="searchButton">Search</button>
-    </form>
-
-    <!-- 1. Map -->
-    <div id="map" class="map" role="region" data-i18n-aria-label="mapLabel"></div>
-
-    <div class="chips-row">
-      <span class="chips-label" data-i18n="testFields"></span>
-      <div id="chips" class="chips"></div>
-    </div>
-
-    <!-- Your own Earth Engine file: picked with the button or dropped anywhere on the page -->
-    <div class="upload-row">
-      <label class="upload-button">
-        <input id="upload-input" type="file" accept=".csv,.json,text/csv,application/json" class="visually-hidden">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span data-i18n="uploadButton"></span>
-      </label>
-      <span class="hint" data-i18n="uploadHint"></span>
-    </div>
-
     <p id="message" class="message" role="status" hidden></p>
 
     <!-- 2. Warning card -->
     <section id="card" class="card" aria-live="polite"></section>
+
+    <!-- Real satellite pictures of the area: a normal year next to the drought year -->
+    <section id="space" class="space" hidden>
+      <h3 class="section-title" data-i18n="spaceTitle"></h3>
+      <p class="hint" data-i18n="spaceIntro"></p>
+      <div class="space-tabs" role="group" data-i18n-aria-label="spaceTitle">
+        <button type="button" data-kind="rgb" aria-pressed="true" data-i18n="spaceTrue"></button>
+        <button type="button" data-kind="ndvi" aria-pressed="false" data-i18n="spaceNdvi"></button>
+      </div>
+      <div id="space-grid" class="space-grid"></div>
+      <div id="ndvi-scale" class="ndvi-scale" hidden aria-hidden="true">
+        <span data-i18n="spaceLow"></span><span class="bar-scale"></span><span data-i18n="spaceHigh"></span>
+      </div>
+    </section>
 
     <!-- Settings for an uploaded file (season, normal years) -->
     <section id="upload-settings" class="panel upload-panel" hidden>
@@ -110,6 +126,7 @@
         </div>
       </div>
 
+      <div class="charts-grid">
       <figure class="chart-box">
         <figcaption data-i18n="ndmiName"></figcaption>
         <div class="chart-wrap"><canvas id="chart-ndmi" role="img"></canvas><div id="lite-ndmi" class="lite-chart" role="img" hidden></div></div>
@@ -118,6 +135,7 @@
         <figcaption data-i18n="ndviName"></figcaption>
         <div class="chart-wrap"><canvas id="chart-ndvi" role="img"></canvas><div id="lite-ndvi" class="lite-chart" role="img" hidden></div></div>
       </figure>
+      </div>
       <ul id="legend" class="legend"></ul>
       <details class="table-box">
         <summary data-i18n="tableShow"></summary>

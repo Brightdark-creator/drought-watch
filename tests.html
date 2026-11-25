@@ -27,7 +27,7 @@
   <ul id="results"></ul>
 </main>
 <script type="module">
-  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, SD_FLOOR } from './js/analysis.js';
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, peakPeriod, SD_FLOOR } from './js/analysis.js';
   import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError, keepUpload, restoreKeptUploads, isUploadKept, forgetUpload, loadSeries } from './js/data.js';
 
   const results = [];
@@ -123,6 +123,7 @@
   check('Summary: 3 red periods (17, 18 from leaf water, 19 from greenness)', sum.redPeriods === 3, `got ${sum.redPeriods}`);
   check('Summary: lowest leaf water is −3 SD in period 18', close(sum.lowestNdmi.z, -3, 1e-9) && sum.lowestNdmi.period === 18);
   check('Summary: worst level of the season is red', sum.worst === 'red');
+  check('Worst moment of the season = the red period with the lowest anomaly (period 18, −3 SD)', peakPeriod(a) === 18);
 
   /* ---------- Normal-year check ---------- */
   // Five normal years with small "wobble" (fixed numbers, no randomness); year 2012 is
@@ -151,6 +152,7 @@
   const halfDry = makeYears(0).map((r) => (r.date.getUTCFullYear() === 2012 && seasonAndPeriod(r.date).period >= 20 && seasonAndPeriod(r.date).period <= 26
     ? { ...r, ndvi: r.ndvi - 0.12, ndmi: r.ndmi - 0.12 } : r));
   check('A drought in only part of the season is still flagged', checkNormalYears(analyseField(field, halfDry)).find((c) => c.year === 2012)?.suspicious === true);
+  check('No warning in a season → no worst moment', peakPeriod(analyseField(field, makeYears(0))) === null);
 
   /* ---------- Confidence ---------- */
   check('Confidence high: 5 normal years, previous picture 10 days earlier, clear result', confidence(a, 15)?.level === 'high');

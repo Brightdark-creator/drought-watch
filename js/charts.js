@@ -21,7 +21,9 @@ const COLORS = {
 };
 
 export const LEVEL_COLORS = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828', off: '#a3aca8', unknown: '#a3aca8' };
-const POINT_BORDER = { ...LEVEL_COLORS, yellow: '#7a5b00' }; // dark edge so yellow shows on white
+const POINT_BORDER = { ...LEVEL_COLORS, yellow: '#7a5b00' };
+// Line colours: yellow is darkened so a thin line is still visible on white.
+const LINE_COLORS = { yellow: '#c79300', red: LEVEL_COLORS.red }; // dark edge so yellow shows on white
 const POINT_STYLE = { green: 'circle', yellow: 'triangle', red: 'crossRot', off: 'circle', unknown: 'circle' };
 const POINT_RADIUS = { green: 4, yellow: 6, red: 7, off: 3, unknown: 3 };
 
@@ -108,7 +110,10 @@ export class IndexChart {
         label: d.texts.season,
         data: d.values,
         borderColor: COLORS.season,
-        borderWidth: 2.5,
+        borderWidth: 3,
+        // Each piece of the line takes the colour of the level at its end,
+        // so the line turns yellow/red where the warning is.
+        segment: { borderColor: (ctx) => LINE_COLORS[levels[ctx.p1DataIndex]] || COLORS.season },
         order: 0, // lowest order is drawn on top
         pointStyle: levels.map((l) => POINT_STYLE[l]),
         pointRadius: levels.map((l) => POINT_RADIUS[l]),

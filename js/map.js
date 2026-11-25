@@ -57,6 +57,8 @@ export async function initMap(container, newHandlers, labels) {
   await loadLeaflet();
   if (map) return;
   map = L.map(container, { worldCopyJump: true }).setView([35, 0], 2);
+  // The warning card overlaps the bottom of the map, so the map credits go to the top (they must stay visible).
+  map.attributionControl.setPosition('topright');
   layers = {
     // Sentinel-2 cloudless: a cloud-free picture of the whole Earth made from
     // the same Sentinel-2 satellites the app uses (by EOX, free for non-commercial use).

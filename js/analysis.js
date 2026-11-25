@@ -359,6 +359,23 @@ export function seasonSummary(result) {
   };
 }
 
+/**
+ * The worst moment of the season: the warning period (yellow/red) where the
+ * more negative of the two anomalies is lowest. Used to open the historic
+ * drought examples at their peak. Returns null if there was no warning.
+ */
+export function peakPeriod(result) {
+  let best = null;
+  for (const p of result.dataPeriods) {
+    const level = result.overall[p];
+    if (!result.inSeason[p] || (level !== 'yellow' && level !== 'red')) continue;
+    const z = Math.min(...['ndmi', 'ndvi'].map((k) => result[k].z[p] ?? Infinity));
+    const rank = (level === 'red' ? -100 : 0) + z; // red always beats yellow
+    if (best == null || rank < best.rank) best = { p, rank };
+  }
+  return best ? best.p : null;
+}
+
 /* ---------- How sure is the result? ---------- */
 
 /** Rules for the confidence label (all in one place so they are easy to explain). */

@@ -7,7 +7,7 @@
  *   i18n.js / lang.js  all texts, dates and numbers
  */
 import * as Data from './data.js';
-import { analyseField, availableSeasons, checkNormalYears, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
+import { analyseField, availableSeasons, checkNormalYears, peakPeriod, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
 import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
   t, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
@@ -27,6 +27,7 @@ const state = {
   period: null,        // the 10-day period chosen with the slider
   compare: false,
   compareYear: null,
+  spaceKind: 'rgb',    // "Seen from space": true colour or greenness map
   light: false,        // light mode = no map
 };
 const charts = {};
@@ -92,9 +93,19 @@ function analysisFor(field) {
   return state.analyses.get(field.id);
 }
 
-/** Level shown on a field's pin and button: its latest picture in the growing season. */
+/**
+ * Which picture a field opens on. Historic drought examples (with an "event"
+ * in fields.json) open at the worst moment of the season; everything else
+ * (e.g. your own file) at the latest picture in the growing season.
+ */
+function startPeriod(field, a) {
+  return (field.event && peakPeriod(a)) ?? a.defaultPeriod;
+}
+
+/** Level shown on a field's pin and button: the level of the picture it opens on. */
 function latestLevel(a) {
-  return a.defaultPeriod == null ? 'unknown' : a.overall[a.defaultPeriod];
+  const p = startPeriod(a.field, a);
+  return p == null ? 'unknown' : a.overall[p];
 }
 
 function updateFieldLevel(id, a) {
@@ -129,7 +140,7 @@ async function selectField(id) {
     return;
   }
   if (state.selectedId !== id) return; // the user picked another field meanwhile
-  state.period = a.defaultPeriod;
+  state.period = startPeriod(field, a);
   state.compareYear = a.typicalYear;
   renderSelected(a);
 }
@@ -177,6 +188,7 @@ async function onSearch(event) {
 function renderSelected(a) {
   $('details').hidden = false;
   renderUploadSettings(a);
+  renderSpace();
   renderSlider(a);
   renderTimeline(a);
   renderCompare(a);
@@ -199,10 +211,12 @@ async function renderCard({ loading = false } = {}) {
   if (!field || loading) {
     card.className = `card${loading ? ' loading' : ''}`;
     card.innerHTML = `
-      <div class="card-visual">${plantSvg(loading ? 'off' : 'green')}</div>
-      <div class="card-body">
-        <h2 class="level">${esc(loading ? t('loading') : t('chooseTitle'))}</h2>
-        ${loading ? '' : `<p class="advice">${esc(t('chooseText'))}</p>`}
+      <div class="card-head">
+        <div class="card-visual">${plantSvg(loading ? 'off' : 'green')}</div>
+        <div class="card-body">
+          <h2 class="level">${esc(loading ? t('loading') : t('chooseTitle'))}</h2>
+          ${loading ? '' : `<p class="advice">${esc(t('chooseText'))}</p>`}
+        </div>
       </div>`;
     return;
   }
@@ -237,32 +251,45 @@ async function renderCard({ loading = false } = {}) {
       ? `<em>${esc(t('fromYourFile'))}</em>`
       : `${esc(crop.startsWith('crop_') ? t('crop_unknown') : crop)}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
   ];
-  const facts = [
-    p != null && a.dates[p] ? t('imageDate', { date: formatDate(a.dates[p]) }) : null,
-    since != null && since !== p ? t('warningSince', { date: formatDate(a.dates[since]) }) : null,
-    t('comparedWith', { years: formatList(a.normalYears) }),
-  ].filter(Boolean);
+  const short = (d) => formatDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
 
   card.className = `card ${level}`;
   card.innerHTML = `
-    <p class="field-name">${meta.join(' · ')}</p>
-    <div class="card-visual">
-      ${plantSvg(level)}
-      <span class="badge" aria-hidden="true">${SYMBOLS[level]}</span>
+    <div class="card-head">
+      <div class="card-visual">
+        ${plantSvg(level)}
+        <span class="badge" aria-hidden="true">${SYMBOLS[level]}</span>
+      </div>
+      <div class="card-body">
+        <p class="field-name">${meta.join(' · ')}</p>
+        <h2 class="level">${esc(t(`level_${level}`))}</h2>
+        <p class="advice">${esc(t(`advice_${level}`))}</p>
+      </div>
     </div>
-    <div class="card-body">
-      <h2 class="level">${esc(t(`level_${level}`))}</h2>
-      <p class="advice">${esc(t(`advice_${level}`))}</p>
+    <div class="kpis">
+      ${kpi(t('kpiPicture'), p != null && a.dates[p] ? esc(short(a.dates[p])) : '–')}
+      ${kpi(t('kpiSince'), since != null ? esc(short(a.dates[since])) : '–', since != null ? sinceNote(a.dataPeriods.filter((q) => q >= since && q <= p).length) : t('kpiNoWarning'), since != null ? 'warn' : '')}
+      ${kpi(t('kpiLead'), lead ? esc(t('leadDays', { days: lead.days })) : '–', lead ? t('kpiLeadNote') : t('kpiLeadNone'), lead ? 'highlight' : '')}
+      ${confidenceKpi(confidence(a, p))}
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
-    ${lead ? `<p class="lead"><span class="lead-days">${esc(t('leadDays', { days: lead.days }))}</span>${esc(t('leadTime', { days: lead.days }))}</p>` : ''}
-    ${confidenceHtml(confidence(a, p))}
-    <p class="meta">${facts.map(esc).join(' · ')}</p>`;
+    <p class="meta">${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
 
-/** Small "Confidence: high" label with the reasons behind it. */
-function confidenceHtml(c) {
-  if (!c) return '';
+const sinceNote = (n) => (n === 1 ? t('kpiSinceOne') : t('kpiSinceNote', { n }));
+
+/** One small tile with a label, a big value and an optional note. */
+function kpi(label, valueHtml, note = '', extraClass = '') {
+  return `<div class="kpi ${extraClass}">
+    <span class="kpi-label">${esc(label)}</span>
+    <span class="kpi-value">${valueHtml}</span>
+    ${note ? `<span class="kpi-note">${esc(note)}</span>` : ''}
+  </div>`;
+}
+
+/** Confidence tile: three little bars like a phone's signal, and the reasons. */
+function confidenceKpi(c) {
+  if (!c) return kpi(t('kpiConfidence'), '–');
   const reasons = [
     t('confYears', { n: c.normalYears }),
     c.gapDays == null ? t('confFirst') : t('confGap', { days: c.gapDays }),
@@ -270,11 +297,32 @@ function confidenceHtml(c) {
   ].filter(Boolean);
   const bars = { high: 3, medium: 2, low: 1 }[c.level];
   const icon = [1, 2, 3].map((i) => `<i class="${i <= bars ? 'on' : ''}"></i>`).join('');
-  return `<p class="confidence conf-${c.level}" title="${esc(t('confExplain'))}">
-    <span class="conf-icon" aria-hidden="true">${icon}</span>
-    <b>${esc(t('confidence', { level: t(`conf_${c.level}`) }))}</b>
-    <span>${esc(reasons.join(' · '))}</span>
-  </p>`;
+  return `<div class="kpi conf-${c.level}" title="${esc(t('confExplain'))}">
+    <span class="kpi-label">${esc(t('kpiConfidence'))}</span>
+    <span class="kpi-value"><span class="conf-icon" aria-hidden="true">${icon}</span>${esc(t(`conf_${c.level}`))}</span>
+    <span class="kpi-note">${esc(reasons.join(' · '))}</span>
+  </div>`;
+}
+
+/** "Seen from space": real Sentinel-2 pictures, normal year next to the drought year. */
+function renderSpace() {
+  const field = currentField();
+  const images = field?.images;
+  $('space').hidden = !images?.normal || !images?.drought || state.light; // light mode: no picture downloads
+  if ($('space').hidden) return;
+  const kind = state.spaceKind;
+  document.querySelectorAll('.space-tabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
+  $('ndvi-scale').hidden = kind !== 'ndvi';
+  const fig = (role) => {
+    const img = images[role];
+    const date = formatDate(new Date(`${img.date}T00:00:00Z`));
+    const alt = t('spaceAlt', { kind: kind === 'rgb' ? t('spaceTrue') : t('spaceNdvi'), name: pick(field.short), date });
+    return `<figure>
+      <div class="space-img"><img src="data/${esc(img[kind])}" alt="${esc(alt)}" width="400" height="400" loading="lazy"></div>
+      <figcaption><b>${esc(t(role === 'normal' ? 'spaceNormal' : 'spaceDrought'))}</b>${esc(date)} · ${esc(t('spaceNdviValue', { value: formatNumber(img.ndviValue, 2) }))}</figcaption>
+    </figure>`;
+  };
+  $('space-grid').innerHTML = fig('normal') + fig('drought');
 }
 
 /** The season at a glance: one bar per 10-day period (click a bar to jump there). */
@@ -413,6 +461,18 @@ function renderLightToggle() {
   const button = $('light-toggle');
   button.setAttribute('aria-pressed', String(state.light));
   $('map').hidden = state.light;
+  document.body.classList.toggle('no-map', state.light);
+  if (!state.light) loadFont();
+}
+
+/** The Manrope font makes the page nicer, but it is a download: never in light mode. */
+function loadFont() {
+  if (document.getElementById('font-css')) return;
+  const link = document.createElement('link');
+  link.id = 'font-css';
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap';
+  document.head.appendChild(link);
 }
 
 /* ---------- Map and light mode ---------- */
@@ -610,6 +670,12 @@ function wireControls() {
     normalYears: [...$('up-normals').querySelectorAll('input:checked')].map((i) => Number(i.value)),
   }));
   $('up-remove').addEventListener('click', removeUpload);
+  document.querySelector('.space-tabs').addEventListener('click', (e) => {
+    const button = e.target.closest('button');
+    if (!button) return;
+    state.spaceKind = button.dataset.kind;
+    renderSpace();
+  });
   $('up-keep').addEventListener('change', (e) => {
     const field = currentField();
     if (!field?.uploaded) return;

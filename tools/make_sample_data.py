@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-make_sample_data.py - creates the SIMULATED sample CSV files in ../data
+make_sample_data.py - creates SIMULATED sample CSV files in ../data/simulated (for teaching; the app now uses real data)
 
 IMPORTANT FOR THE SCIENCE FAIR
 These files are NOT real satellite measurements. They are simulated so the
@@ -32,7 +32,7 @@ import random
 from datetime import date, timedelta
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "data"
+OUT = Path(__file__).resolve().parent.parent / "data" / "simulated"  # not used by the app any more (real data replaced it)
 
 
 def s_curve(t, middle, width):

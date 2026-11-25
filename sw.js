@@ -11,7 +11,7 @@
  *
  * After changing app files, raise VERSION so old copies are thrown away.
  */
-const VERSION = 'drought-watch-v7';
+const VERSION = 'drought-watch-v8';
 
 const APP_FILES = [
   './', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
@@ -19,6 +19,7 @@ const APP_FILES = [
   './js/map.js', './js/geocode.js', './js/i18n.js', './js/lang.js', './js/charts-lite.js',
   './js/summary.js', './summary.html',
   './data/fields.json', './data/de-uelzen.csv', './data/it-mantova.csv', './data/us-illinois.csv',
+  './data/ar-pergamino.csv', './data/ma-chaouia.csv', './data/au-temora.csv',
 ];
 // Libraries are saved the first time they are used (see cacheFirst), not up front,
 // so light mode never downloads them.

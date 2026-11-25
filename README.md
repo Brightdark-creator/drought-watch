@@ -4,10 +4,12 @@ A free drought early-warning web app. It uses Sentinel-2 satellite data to spot
 crop stress before plants wilt. Plain HTML, CSS and JavaScript: no build step,
 runs as a static site (GitHub Pages).
 
-> **Sample data is simulated.** The three test fields (northern Germany 2018,
-> Po Valley 2022, US Midwest 2023) use data made by `tools/make_sample_data.py`
-> so the app works straight away. Replace them with your Earth Engine exports
-> for real results.
+The app ships with **real Sentinel-2 measurements for six drought seasons on
+five continents**: Germany 2018, Italy 2022, USA 2023, Argentina 2022/23,
+Morocco 2021/22 and Australia 2019. They were downloaded with
+`tools/fetch_sentinel2.py` from the Microsoft Planetary Computer (free, no
+account) and checked against what really happened (see "Results with real
+data" below).
 
 ## File structure
 
@@ -33,14 +35,71 @@ drought-watch/
 │   ├── i18n.js             picks the language, formats dates/numbers/units
 │   └── lang.js             ALL texts, English and German
 ├── data/
-│   ├── fields.json         list of fields: name, position, outline, file, years
-│   ├── de-uelzen.csv       one CSV per field: date, year, NDVI, NDMI
-│   ├── it-mantova.csv
-│   └── us-illinois.csv
+│   ├── fields.json         the six areas: name, position, outline, season, normal years, event
+│   ├── <area>.csv          real Sentinel-2 values per picture: date, year, NDVI, NDMI, clear
+│   ├── images/             "Seen from space" pictures (true colour + greenness map)
+│   └── simulated/          the old simulated sample files (for teaching only)
 └── tools/
+    ├── fetch_sentinel2.py      downloads REAL Sentinel-2 NDVI/NDMI for any area (no account)
+    ├── fetch_images.py         downloads the "Seen from space" pictures
     ├── make_sample_data.py     makes the simulated sample CSVs
     └── earth-engine-export.js  Earth Engine Code Editor script that exports a CSV for one field
 ```
+
+## Results with real data
+
+Each area is a 1 km × 1 km square of farmland (100 ha; several fields, so that
+crop rotation from year to year averages out). Clear pixels only (Sentinel-2
+Scene Classification: vegetation or bare soil); pictures with less than 60 %
+of the area clear are skipped. Pictures processed since 2022 have a +1000
+offset in every band, which the download script removes.
+
+| Area | Drought season | Normal years used | Warning (yellow) | First red | Lead time* |
+|---|---|---|---|---|---|
+| Uelzen, Germany | 2018 | 2017, 2021, 2023, 2024 | 24 Jul | 18 Aug | 25 days |
+| Mantua, Italy | 2022 | 2018–2021, 2023, 2024 | 30 Jul | 14 Aug | 15 days |
+| Central Illinois, USA | 2023 | 2017, 2018, 2020–2022, 2024 | – | – | – |
+| Pergamino, Argentina | 2022/23 (from July) | 2016/17, 2018/19–2020/21, 2023/24 | 6 Jan | 16 Jan | – |
+| Chaouia, Morocco | 2021/22 (from Sept.) | 2016/17–2018/19, 2020/21 | 1 Jan | 26 Jan | 35 days |
+| Temora, Australia | 2019 | 2016, 2020–2022 | 26 Aug | 15 Sep | 20 days |
+
+\* days between leaf water (NDMI) dropping below normal and greenness (NDVI)
+turning red.
+
+**What this shows**
+- 5 of 6 drought seasons got a red warning. Where greenness also fell far
+  below normal (4 areas), leaf water warned **24 days earlier on average**.
+- **Illinois 2023: no warning.** The flash drought hit in May–June while the
+  crops were small (before the growing season the app judges), and rain came
+  back in July. As far as I know Illinois still harvested a record maize crop
+  in 2023, so "no damage visible from space" may be the right answer. Check
+  this against USDA statistics before you use it in your report.
+- **Argentina:** red for only one picture in mid-January, then green again
+  (late-sown or replanted crops). The drought was real but the signal at this
+  spot is short.
+- **Australia:** z-scores down to −20 SD. The normal years (2016, 2020–2022)
+  were all wet and very alike, so the normal range is extremely narrow. The
+  warning is right, but the size of the number says more about the narrow
+  normal range than about the drought. Confidence shows "low" there (only 3
+  normal years with a picture at that date).
+- **Germany and Italy warn in July/August**, not in spring: a 1 km² mix of
+  crops (cereals, maize, beet…) is judged on its summer peak; early stress in
+  cereals is diluted by the other crops.
+- **Sensitivity check:** starting the growing season at 30 % instead of 50 %
+  of the normal NDVI range changes no warning date and no lead time.
+- **Normal-year check:** flags Morocco 2017/18, although that was a good
+  harvest nationally; the area probably had a different land use or timing
+  that year. This is what the check is for: a reason to look closer.
+
+**Where the normal years come from:** known drought history (e.g. Germany was
+also dry in 2019, 2020 and 2022; Italy in 2017; Argentina in 2017/18 and
+2021/22; Morocco in 2019/20, 2022/23 and 2023/24; New South Wales in 2017–2018;
+Illinois 2019 was left out because floods delayed planting by weeks). Please
+confirm these with sources (national weather services, FAO/GIEWS, USDA) for
+your report.
+
+To refresh or add areas: edit `AREAS` in `tools/fetch_sentinel2.py`, run it,
+add the area to `data/fields.json`, then run `tools/fetch_images.py`.
 
 ## How the warning works
 
@@ -77,10 +136,17 @@ measure how early the warning came.
 
 ## What the screen shows
 
+- **Header:** search, "use my location", the six drought areas and "Analyse
+  your own CSV". Each area opens at the worst moment of its drought season.
+- **Map:** full-width satellite picture; the warning card floats over its edge.
+
 - **Warning card:** a plant that stands up (✓ healthy), bends (! watch) or
   wilts in dry soil (✕ drought stress), the level in one word, one sentence of
   advice, and two meters showing how many standard deviations NDMI and NDVI
   are from normal. The meter zones use the same −1/−2 limits as the rule.
+- **Seen from space:** real Sentinel-2 pictures of the area at the same time
+  of year in a normal year and in the drought year, as true colour or as a
+  greenness (NDVI) map. The white square is the 1 km area the app measures.
 - **Season at a glance:** one bar per 10-day period. Taller bar = stronger
   warning, so it also works without colour vision. Click a bar to jump there.
 - **Charts:** this season against the normal range; the growing season is

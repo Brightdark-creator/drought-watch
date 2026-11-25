@@ -1,67 +1,371 @@
 {
+  "source": "Copernicus Sentinel-2 Level-2A via Microsoft Planetary Computer, made with tools/fetch_sentinel2.py",
   "fields": [
     {
       "id": "de-uelzen",
       "name": {
-        "en": "Wheat field near Uelzen, northern Germany",
-        "de": "Weizenfeld bei Uelzen, Norddeutschland"
+        "en": "Farmland near Uelzen, northern Germany",
+        "de": "Ackerland bei Uelzen, Norddeutschland"
       },
       "short": {
-        "en": "Uelzen, Germany · 2018",
-        "de": "Uelzen, Deutschland · 2018"
+        "en": "Germany · 2018",
+        "de": "Deutschland · 2018"
       },
-      "crop": "winter_wheat",
+      "crop": "mixed",
       "lat": 52.95,
       "lon": 10.626,
-      "areaHa": 20,
-      "polygon": [[52.9482, 10.62227], [52.9518, 10.62227], [52.9518, 10.62973], [52.9482, 10.62973]],
+      "areaHa": 100,
+      "polygon": [
+        [
+          52.94551,
+          10.61855
+        ],
+        [
+          52.95449,
+          10.61855
+        ],
+        [
+          52.95449,
+          10.63345
+        ],
+        [
+          52.94551,
+          10.63345
+        ]
+      ],
       "file": "de-uelzen.csv",
       "season": 2018,
       "seasonStartMonth": 1,
-      "normalYears": [2016, 2017, 2019, 2020, 2021],
-      "simulated": true
+      "normalYears": [
+        2017,
+        2021,
+        2023,
+        2024
+      ],
+      "event": {
+        "en": "Drought and heat in spring and summer 2018 across northern and central Europe."
+      },
+      "imageDate": "2018-09-19",
+      "images": {
+        "drought": {
+          "date": "2018-09-19",
+          "ndviValue": 0.429,
+          "rgb": "images/de-uelzen-drought-rgb.jpg",
+          "ndvi": "images/de-uelzen-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2023-09-26",
+          "ndviValue": 0.61,
+          "rgb": "images/de-uelzen-normal-rgb.jpg",
+          "ndvi": "images/de-uelzen-normal-ndvi.jpg"
+        }
+      }
     },
     {
       "id": "it-mantova",
       "name": {
-        "en": "Maize field near Mantua, Po Valley, Italy",
-        "de": "Maisfeld bei Mantua, Poebene, Italien"
+        "en": "Farmland near Mantua, Po Valley, Italy",
+        "de": "Ackerland bei Mantua, Poebene, Italien"
       },
       "short": {
-        "en": "Po Valley, Italy · 2022",
-        "de": "Poebene, Italien · 2022"
+        "en": "Italy · 2022",
+        "de": "Italien · 2022"
       },
-      "crop": "maize",
+      "crop": "mixed",
       "lat": 45.1224,
       "lon": 10.6757,
-      "areaHa": 12,
-      "polygon": [[45.12105, 10.67315], [45.12375, 10.67315], [45.12375, 10.67825], [45.12105, 10.67825]],
+      "areaHa": 100,
+      "polygon": [
+        [
+          45.11791,
+          10.66933
+        ],
+        [
+          45.12689,
+          10.66933
+        ],
+        [
+          45.12689,
+          10.68207
+        ],
+        [
+          45.11791,
+          10.68207
+        ]
+      ],
       "file": "it-mantova.csv",
       "season": 2022,
       "seasonStartMonth": 1,
-      "normalYears": [2017, 2018, 2019, 2020, 2021],
-      "simulated": true
+      "normalYears": [
+        2018,
+        2019,
+        2020,
+        2021,
+        2023,
+        2024
+      ],
+      "event": {
+        "en": "Worst drought in the Po basin in about 70 years; state of emergency in summer 2022."
+      },
+      "imageDate": "2022-08-14",
+      "images": {
+        "drought": {
+          "date": "2022-08-09",
+          "ndviValue": 0.504,
+          "rgb": "images/it-mantova-drought-rgb.jpg",
+          "ndvi": "images/it-mantova-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2021-08-19",
+          "ndviValue": 0.69,
+          "rgb": "images/it-mantova-normal-rgb.jpg",
+          "ndvi": "images/it-mantova-normal-ndvi.jpg"
+        }
+      }
     },
     {
       "id": "us-illinois",
       "name": {
-        "en": "Maize field in central Illinois, US Midwest",
-        "de": "Maisfeld im Zentrum von Illinois, Mittlerer Westen der USA"
+        "en": "Farmland in central Illinois, USA",
+        "de": "Ackerland im Zentrum von Illinois, USA"
       },
       "short": {
-        "en": "Illinois, USA · 2023",
-        "de": "Illinois, USA · 2023"
+        "en": "USA · 2023",
+        "de": "USA · 2023"
       },
-      "crop": "maize",
+      "crop": "mixed",
       "lat": 40.18,
       "lon": -88.4535,
-      "areaHa": 64,
-      "polygon": [[40.1764, -88.4582], [40.1836, -88.4582], [40.1836, -88.4488], [40.1764, -88.4488]],
+      "areaHa": 100,
+      "polygon": [
+        [
+          40.17551,
+          -88.45938
+        ],
+        [
+          40.18449,
+          -88.45938
+        ],
+        [
+          40.18449,
+          -88.44762
+        ],
+        [
+          40.17551,
+          -88.44762
+        ]
+      ],
       "file": "us-illinois.csv",
       "season": 2023,
       "seasonStartMonth": 1,
-      "normalYears": [2018, 2019, 2020, 2021, 2022],
-      "simulated": true
+      "normalYears": [
+        2017,
+        2018,
+        2020,
+        2021,
+        2022,
+        2024
+      ],
+      "event": {
+        "en": "Flash drought in May and June 2023 across the Corn Belt; rain returned in July."
+      },
+      "imageDate": "2023-06-28",
+      "images": {
+        "drought": {
+          "date": "2023-06-24",
+          "ndviValue": 0.55,
+          "rgb": "images/us-illinois-drought-rgb.jpg",
+          "ndvi": "images/us-illinois-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2022-06-29",
+          "ndviValue": 0.509,
+          "rgb": "images/us-illinois-normal-rgb.jpg",
+          "ndvi": "images/us-illinois-normal-ndvi.jpg"
+        }
+      }
+    },
+    {
+      "id": "ar-pergamino",
+      "name": {
+        "en": "Farmland near Pergamino, Pampas, Argentina",
+        "de": "Ackerland bei Pergamino, Pampa, Argentinien"
+      },
+      "short": {
+        "en": "Argentina · 2022/23",
+        "de": "Argentinien · 2022/23"
+      },
+      "crop": "mixed",
+      "lat": -33.98,
+      "lon": -60.7,
+      "areaHa": 100,
+      "polygon": [
+        [
+          -33.98449,
+          -60.70542
+        ],
+        [
+          -33.97551,
+          -60.70542
+        ],
+        [
+          -33.97551,
+          -60.69458
+        ],
+        [
+          -33.98449,
+          -60.69458
+        ]
+      ],
+      "file": "ar-pergamino.csv",
+      "season": 2022,
+      "seasonStartMonth": 7,
+      "normalYears": [
+        2016,
+        2018,
+        2019,
+        2020,
+        2023
+      ],
+      "event": {
+        "en": "Historic drought in the 2022/23 summer season in the Pampas."
+      },
+      "imageDate": "2023-01-16",
+      "images": {
+        "drought": {
+          "date": "2023-01-16",
+          "ndviValue": 0.424,
+          "rgb": "images/ar-pergamino-drought-rgb.jpg",
+          "ndvi": "images/ar-pergamino-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2021-01-21",
+          "ndviValue": 0.705,
+          "rgb": "images/ar-pergamino-normal-rgb.jpg",
+          "ndvi": "images/ar-pergamino-normal-ndvi.jpg"
+        }
+      }
+    },
+    {
+      "id": "ma-chaouia",
+      "name": {
+        "en": "Farmland in the Chaouia plain, Morocco",
+        "de": "Ackerland in der Chaouia-Ebene, Marokko"
+      },
+      "short": {
+        "en": "Morocco · 2021/22",
+        "de": "Marokko · 2021/22"
+      },
+      "crop": "mixed",
+      "lat": 33.05,
+      "lon": -7.55,
+      "areaHa": 100,
+      "polygon": [
+        [
+          33.04551,
+          -7.55536
+        ],
+        [
+          33.05449,
+          -7.55536
+        ],
+        [
+          33.05449,
+          -7.54464
+        ],
+        [
+          33.04551,
+          -7.54464
+        ]
+      ],
+      "file": "ma-chaouia.csv",
+      "season": 2021,
+      "seasonStartMonth": 9,
+      "normalYears": [
+        2016,
+        2017,
+        2018,
+        2020
+      ],
+      "event": {
+        "en": "Severe drought in the 2021/22 winter-wheat season, one of the driest in decades."
+      },
+      "imageDate": "2022-02-20",
+      "images": {
+        "drought": {
+          "date": "2022-02-15",
+          "ndviValue": 0.31,
+          "rgb": "images/ma-chaouia-drought-rgb.jpg",
+          "ndvi": "images/ma-chaouia-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2018-02-11",
+          "ndviValue": 0.652,
+          "rgb": "images/ma-chaouia-normal-rgb.jpg",
+          "ndvi": "images/ma-chaouia-normal-ndvi.jpg"
+        }
+      }
+    },
+    {
+      "id": "au-temora",
+      "name": {
+        "en": "Farmland near Temora, New South Wales, Australia",
+        "de": "Ackerland bei Temora, New South Wales, Australien"
+      },
+      "short": {
+        "en": "Australia · 2019",
+        "de": "Australien · 2019"
+      },
+      "crop": "mixed",
+      "lat": -34.395,
+      "lon": 147.458,
+      "areaHa": 100,
+      "polygon": [
+        [
+          -34.39949,
+          147.45256
+        ],
+        [
+          -34.39051,
+          147.45256
+        ],
+        [
+          -34.39051,
+          147.46344
+        ],
+        [
+          -34.39949,
+          147.46344
+        ]
+      ],
+      "file": "au-temora.csv",
+      "season": 2019,
+      "seasonStartMonth": 1,
+      "normalYears": [
+        2016,
+        2020,
+        2021,
+        2022
+      ],
+      "event": {
+        "en": "Drought across New South Wales, worst in 2019 (winter crop season)."
+      },
+      "imageDate": "2019-10-15",
+      "images": {
+        "drought": {
+          "date": "2019-10-10",
+          "ndviValue": 0.289,
+          "rgb": "images/au-temora-drought-rgb.jpg",
+          "ndvi": "images/au-temora-drought-ndvi.jpg"
+        },
+        "normal": {
+          "date": "2020-10-14",
+          "ndviValue": 0.693,
+          "rgb": "images/au-temora-normal-rgb.jpg",
+          "ndvi": "images/au-temora-normal-ndvi.jpg"
+        }
+      }
     }
-  ]
+  ],
+  "imageDateNote": "imageDate = date for the 'Seen from space' pictures: the worst point of the season found by the app (peakPeriod); for Illinois, which had no warning, the time of the reported flash drought."
 }

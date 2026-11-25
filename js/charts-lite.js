@@ -70,7 +70,17 @@ export function drawLiteChart(container, d) {
   }
   parts.push(line(d.mean, `stroke="${C.mean}" stroke-width="1.5" stroke-dasharray="6 4"`));
   if (d.compare) parts.push(line(d.compare.values, `stroke="${C.compare}" stroke-width="2"`));
-  parts.push(line(d.values, `stroke="${C.season}" stroke-width="2.5" stroke-linejoin="round"`));
+  // This season: each piece takes the colour of the level at its end (yellow/red where the warning is).
+  const LINE = { yellow: '#c79300', red: LEVEL.red };
+  let prev = null;
+  d.values.forEach((v, i) => {
+    if (v == null) return;
+    if (prev != null) {
+      const color = LINE[d.levels[i]] || C.season;
+      parts.push(`<line x1="${x(prev).toFixed(1)}" y1="${y(d.values[prev]).toFixed(1)}" x2="${x(i).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`);
+    }
+    prev = i;
+  });
   // points: ● normal, ▲ below normal, ✕ far below normal
   d.values.forEach((v, i) => {
     if (v == null) return;

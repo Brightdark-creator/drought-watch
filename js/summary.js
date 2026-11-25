@@ -61,6 +61,7 @@ async function init() {
     <article class="field-card">
       <h3><span class="mini lvl-${s.worst}" aria-hidden="true">${SYMBOLS[s.worst]}</span> ${esc(pick(field.name))}</h3>
       <p class="meta">${esc(field.uploaded ? t('fromYourFile') : t(`crop_${field.crop}`))} · ${esc(t('season'))} ${a.season} · ${esc(t('comparedWith', { years: formatList(a.normalYears) }))}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}</p>
+      ${field.event ? `<p class="event"><b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))}</p>` : ''}
       <div class="timeline">${timelineHtml(a, null, monthLabel)}</div>
       <p>${s.lead
         ? esc(t('summaryLead', { ndmiDate: formatDate(a.dates[s.lead.ndmiStart]), ndviDate: formatDate(a.dates[s.lead.ndviRed]), days: s.lead.days }))
@@ -70,10 +71,13 @@ async function init() {
     </article>`).join('');
 
   const leads = results.map((r) => r.s.lead?.days).filter((d) => d != null);
+  const red = results.filter((r) => r.s.worst === 'red').length;
+  const parts = [t('summaryDetected', { n: red, total: results.length })];
   if (leads.length) {
     const avg = Math.round(leads.reduce((x, y) => x + y, 0) / leads.length);
-    $('headline').textContent = t('summaryHeadline', { days: avg, count: leads.length, total: results.length });
+    parts.push(t('summaryHeadline', { days: avg, count: leads.length }));
   }
+  $('headline').textContent = parts.join(' ');
 }
 
 /** Small table: each normal year compared with the other normal years. */
