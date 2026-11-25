@@ -100,13 +100,32 @@ red, lead time, lowest leaf water and greenness, and the number of red
 periods, plus each field's season timeline. The Print button gives a clean
 handout.
 
+It also runs a **normal-year check**: each normal year is compared with the
+other normal years only (leave-one-out). If its median anomaly over the
+growing season is below −2 SD for both leaf water and greenness, the year is
+marked "check": it may have been a drought year itself (which would make
+"normal" too dry and warnings too late) or a different crop was grown. Look it
+up in weather records and remove it from `normalYears` if it was dry. With
+only ~5 normal years one year can look low by chance, so this is a hint, not a
+verdict. (In the simulated Uelzen data, 2017 is flagged: by chance its random
+peak came out about 0.05 lower than the other years.)
+
 ## Tests
 
 Open <http://localhost:8000/tests.html> while the local server runs. It checks
 the calendar, the average/SD/z-score, every part of the warning rule (yellow,
 red only twice in a row, cloudy gaps, SD minimum, too few normal years), the
 lead time, the season summary, the confidence label, the CSV reader and the
-distance formula with small examples whose answers are known. All 40 should pass.
+distance formula, and the normal-year check, with small examples whose answers
+are known. All 43 should pass.
+
+## Accessibility
+
+Checked with the axe-core accessibility checker (app in English and German,
+phone and desktop width, light mode, results page): no violations. Colours
+were measured: all text is at least 4.5:1, the yellow shapes have a dark edge
+so they reach 3:1 on white, and every level also has its own symbol and bar
+height, so nothing depends on colour alone.
 
 ## Run it on your computer
 

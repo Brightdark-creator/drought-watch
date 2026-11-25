@@ -5,7 +5,7 @@
  * leaf water warned before greenness, and the lowest anomalies.
  */
 import * as Data from './data.js';
-import { analyseField, seasonSummary, SYMBOLS } from './analysis.js';
+import { analyseField, seasonSummary, checkNormalYears, SYMBOLS } from './analysis.js';
 import { timelineHtml } from './visuals.js';
 import { t, pick, setLanguage, applyStaticTexts, formatDate, formatSigned, formatList } from './i18n.js';
 
@@ -64,6 +64,7 @@ async function init() {
       <p>${s.lead
         ? esc(t('summaryLead', { ndmiDate: formatDate(a.dates[s.lead.ndmiStart]), ndviDate: formatDate(a.dates[s.lead.ndviRed]), days: s.lead.days }))
         : esc(t('summaryNoLead'))}</p>
+      ${normalCheckHtml(checkNormalYears(a))}
       <p><a href="./?field=${encodeURIComponent(field.id)}">${esc(t('openInApp'))}</a></p>
     </article>`).join('');
 
@@ -72,6 +73,24 @@ async function init() {
     const avg = Math.round(leads.reduce((x, y) => x + y, 0) / leads.length);
     $('headline').textContent = t('summaryHeadline', { days: avg, count: leads.length, total: results.length });
   }
+}
+
+/** Small table: each normal year compared with the other normal years. */
+function normalCheckHtml(checks) {
+  if (!checks.length) return '';
+  const fmt = (z) => (z == null ? '–' : esc(formatSigned(z)));
+  const flagged = checks.filter((c) => c.suspicious).map((c) => c.year);
+  return `<details class="normal-check"${flagged.length ? ' open' : ''}>
+    <summary>${esc(t('normalCheckTitle'))}: ${esc(flagged.length ? t('normalCheckFlag', { years: formatList(flagged) }) : t('normalCheckOk'))}</summary>
+    <p class="hint">${esc(t('normalCheckHelp'))}</p>
+    <table>
+      <thead><tr><th scope="col">${esc(t('season'))}</th><th scope="col">${esc(t('ndmiName'))}</th><th scope="col">${esc(t('ndviName'))}</th><th scope="col">${esc(t('tableLevel'))}</th></tr></thead>
+      <tbody>${checks.map((c) => `<tr${c.suspicious ? ' class="flagged"' : ''}>
+        <th scope="row">${c.year}</th><td>${fmt(c.ndmi)}</td><td>${fmt(c.ndvi)}</td>
+        <td>${c.suspicious ? `<span class="mini lvl-yellow" aria-hidden="true">!</span> ${esc(t('normalCheckLook'))}` : `<span class="mini lvl-green" aria-hidden="true">✓</span>`}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </details>`;
 }
 
 init().catch((error) => {

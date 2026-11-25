@@ -260,6 +260,51 @@ function mostTypicalYear(result) {
   return best;
 }
 
+/* ---------- Are the "normal" years really normal? ---------- */
+
+/**
+ * A normal year is flagged when its typical anomaly is below −2 SD for BOTH
+ * leaf water and greenness (a real drought lowers both). With only ~5 normal
+ * years one year often looks a bit low just by chance, so the limit is strict
+ * and the result is a hint to check that year, not a verdict.
+ */
+export const SUSPICIOUS_YEAR_Z = -2;
+
+/**
+ * If one of the "normal" years was secretly a drought year, the normal range
+ * is too low and warnings come too late. So each normal year is compared with
+ * the OTHER normal years only ("leave one out"): its median z-score over the
+ * growing season. Below −2 for both indices means it looks dry itself (or a
+ * different crop was grown that year). Needs at least 4 normal years.
+ * Returns [{ year, ndmi, ndvi, suspicious }].
+ */
+export function checkNormalYears(result) {
+  const years = result.normalYears;
+  if (years.length < MIN_NORMAL_YEARS + 1) return [];
+  return years.map((year) => {
+    const others = years.filter((y) => y !== year);
+    const medianZ = (key) => {
+      const zs = [];
+      for (let p = 0; p < PERIODS; p++) {
+        if (!result.inSeason[p]) continue;
+        const v = result.normals[year][key][p];
+        const vals = others.map((y) => result.normals[y][key][p]).filter((x) => x != null);
+        if (v == null || vals.length < MIN_NORMAL_YEARS) continue;
+        const s = meanAndSd(vals);
+        zs.push((v - s.mean) / Math.max(s.sd, SD_FLOOR));
+      }
+      if (!zs.length) return null;
+      zs.sort((a, b) => a - b);
+      const mid = Math.floor(zs.length / 2);
+      return zs.length % 2 ? zs[mid] : (zs[mid - 1] + zs[mid]) / 2;
+    };
+    const ndmi = medianZ('ndmi');
+    const ndvi = medianZ('ndvi');
+    const suspicious = ndmi != null && ndvi != null && ndmi < SUSPICIOUS_YEAR_Z && ndvi < SUSPICIOUS_YEAR_Z;
+    return { year, ndmi, ndvi, suspicious };
+  });
+}
+
 /* ---------- Whole-season summary (for the results page) ---------- */
 
 /**

@@ -27,7 +27,7 @@
   <ul id="results"></ul>
 </main>
 <script type="module">
-  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, SD_FLOOR } from './js/analysis.js';
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, SD_FLOOR } from './js/analysis.js';
   import { parseCsv, distanceKm } from './js/data.js';
 
   const results = [];
@@ -123,6 +123,29 @@
   check('Summary: 3 red periods (17, 18 from leaf water, 19 from greenness)', sum.redPeriods === 3, `got ${sum.redPeriods}`);
   check('Summary: lowest leaf water is −3 SD in period 18', close(sum.lowestNdmi.z, -3, 1e-9) && sum.lowestNdmi.period === 18);
   check('Summary: worst level of the season is red', sum.worst === 'red');
+
+  /* ---------- Normal-year check ---------- */
+  // Five normal years with small "wobble" (fixed numbers, no randomness); year 2012 is
+  // 0.10 lower in both indices all season = a hidden drought year.
+  const wobble = [0.01, -0.012, 0.006, -0.004, 0.009, -0.008, 0.003];
+  const makeYears = (dryOffset) => {
+    const out = [];
+    [2010, 2011, 2012, 2013, 2014].forEach((year, yi) => {
+      for (let p = 0; p < 36; p++) {
+        const date = periodStart(year, p); date.setUTCDate(date.getUTCDate() + 4);
+        const v = 0.5 + seasonShape(p) + wobble[(p + yi * 3) % wobble.length] + (year === 2012 ? dryOffset : 0);
+        out.push({ date, ndvi: v, ndmi: v - 0.2 });
+      }
+    });
+    const date = periodStart(2020, 15); date.setUTCDate(date.getUTCDate() + 4);
+    out.push({ date, ndvi: 0.85, ndmi: 0.65 });
+    return out;
+  };
+  const dry = checkNormalYears(analyseField(field, makeYears(-0.10)));
+  check('Normal-year check flags a hidden drought year (2012, −0.10 all season)', dry.find((c) => c.year === 2012)?.suspicious === true);
+  check('…and does not flag the other normal years', dry.filter((c) => c.suspicious).length === 1);
+  const fine = checkNormalYears(analyseField(field, makeYears(-0.02)));
+  check('A year only a little lower (−0.02) is not flagged', fine.every((c) => !c.suspicious));
 
   /* ---------- Confidence ---------- */
   check('Confidence high: 5 normal years, previous picture 10 days earlier, clear result', confidence(a, 15)?.level === 'high');
