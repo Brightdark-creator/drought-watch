@@ -11,7 +11,7 @@
  *
  * After changing app files, raise VERSION so old copies are thrown away.
  */
-const VERSION = 'drought-watch-v3';
+const VERSION = 'drought-watch-v4';
 
 const APP_FILES = [
   './', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
@@ -50,7 +50,9 @@ self.addEventListener('fetch', (event) => {
 
 async function networkFirst(request) {
   const cache = await caches.open(VERSION);
-  const fromNetwork = fetch(request).then((response) => {
+  // 'no-cache' = always ask the server if there is a newer version (cheap when
+  // nothing changed), so an update never mixes old and new files.
+  const fromNetwork = fetch(request, { cache: 'no-cache' }).then((response) => {
     if (response.ok) cache.put(request, response.clone());
     return response;
   });
