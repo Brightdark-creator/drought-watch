@@ -91,6 +91,18 @@ turning red.
   harvest nationally; the area probably had a different land use or timing
   that year. This is what the check is for: a reason to look closer.
 
+**Replication: two more spots per region.** To check that a result is not
+luck, the same rule ran on two more 1 km² farmland spots per region, 8–15 km
+from the main one (checked on satellite pictures: no towns, rivers or bush;
+files in `data/replicates/`, made with `fetch_sentinel2.py --replicates`).
+The results page shows them in the column "Two spots nearby".
+- Germany, Argentina, Morocco, Australia: red at both nearby spots too, with
+  similar dates (Argentina's second spot later, end of March).
+- Italy: only yellow ("watch") at both nearby spots, so the red at the main
+  spot is weaker evidence than it looks; the drought signal there varies a lot
+  from field to field (irrigation is common in the Po Valley).
+- USA: no red nearby either, which agrees with "no damage".
+
 **Where the normal years come from:** known drought history, checked with
 sources: Germany was also dry in 2019, 2020 and 2022 (one multi-year drought
 2018–2022 in the research literature); Argentina in 2017/18 (worst in decades

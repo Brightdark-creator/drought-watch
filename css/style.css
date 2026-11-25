@@ -144,6 +144,8 @@ select, .toggle, .search button, .chip {
 .map[hidden] { display: none; }
 .leaflet-container { font: 13px/1.4 var(--font); }
 .leaflet-control-layers { border-radius: 10px !important; font-size: 0.85rem; }
+/* Map credits sit top-right (the card covers the bottom); keep them clear of the zoom buttons on phones */
+.leaflet-top.leaflet-right .leaflet-control-attribution { max-width: calc(100vw - 70px); font-size: 10px; line-height: 1.35; border-radius: 0 0 0 6px; }
 .leaflet-control-layers-base label { padding: 2px 4px; }
 
 /* Field pins */

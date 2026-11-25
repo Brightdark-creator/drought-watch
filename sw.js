@@ -11,7 +11,7 @@
  *
  * After changing app files, raise VERSION so old copies are thrown away.
  */
-const VERSION = 'drought-watch-v8';
+const VERSION = 'drought-watch-v9';
 
 const APP_FILES = [
   './', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
