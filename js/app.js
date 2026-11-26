@@ -360,6 +360,7 @@ async function renderCard({ loading = false } = {}) {
     </div>
     ${sourcesPanel(sources, p, a)}
     ${outlookPanel(field, a, p, level)}
+    ${officialPanel(field, a, p, level)}
     ${calcPanel(sources, p, a, level)}
     <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t(field.model === 'merra' ? 'liveSourceNasa' : 'liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
@@ -493,9 +494,7 @@ const outlooks = new Map();
 
 function outlookPanel(field, a, p, level) {
   // Only for "now": the newest period of a season that is still running
-  const newest = a.dataPeriods.at(-1);
-  const date = p == null ? null : a.labels[p];
-  if (p == null || p !== newest || !date || Date.now() - date.getTime() > 40 * 86400000) return '';
+  if (!isNow(a, p)) return '';
   const key = Data.liveId(field.lat, field.lon);
   if (!outlooks.has(key)) {
     outlooks.set(key, null);
@@ -520,6 +519,51 @@ function outlookPanel(field, a, p, level) {
       <p><b>${esc(formatNumber(o.et0, 0))} mm</b><span>${esc(t('outlookEt0'))}</span></p>
     </div>
     <p class="outlook-verdict">${esc(t(verdict, { share: share ?? '–' }))}</p>
+  </div>`;
+}
+
+/* ---------- Check against the official drought monitors ---------- */
+const officials = new Map();
+
+/** Same "now" rule as the outlook: the official maps show today, not past seasons. */
+function isNow(a, p) {
+  const date = p == null ? null : a.labels[p];
+  return p != null && p === a.dataPeriods.at(-1) && date && Date.now() - date.getTime() < 40 * 86400000;
+}
+
+function officialPanel(field, a, p, level) {
+  if (!isNow(a, p)) return '';
+  const key = Data.liveId(field.lat, field.lon);
+  if (!officials.has(key)) {
+    officials.set(key, null);
+    Data.loadOfficial(field.lat, field.lon)
+      .then((o) => { officials.set(key, o); if (currentField() === field) renderCard(); })
+      .catch(() => officials.delete(key));
+  }
+  const list = officials.get(key);
+  const title = `<h3 class="sources-title">${esc(t('officialTitle'))}</h3>`;
+  if (!list) return `<div class="official">${title}<p class="hint loading-line">${esc(t('officialLoading'))}</p></div>`;
+  const shown = list.filter((o) => !o.outside);
+  const judged = shown.filter((o) => o.level);
+  const dry = judged.filter((o) => o.level !== 'green').length;
+  const theirs = combineLevels(judged.map((o) => o.level));
+  const ours = ['green', 'yellow', 'red'].includes(level) ? level : null;
+  const verdict = !theirs || !ours ? 'officialNoCompare'
+    : theirs === ours ? 'officialAgree'
+    : (theirs === 'green') !== (ours === 'green') ? 'officialDisagree' : 'officialClose';
+  const rows = shown.map((o) => {
+    const symbol = o.level || 'off';
+    const word = o.word ? t(o.word) : o.level ? t(`idx_${o.level}`) : t('srcNone');
+    const date = o.date ? formatDate(o.date, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return `<li><span class="mini lvl-${symbol}" aria-hidden="true">${SYMBOLS[symbol]}</span>
+      <span class="src-name">${esc(t(`official_${o.id}`))}</span>
+      <span class="src-detail"><b>${esc(word)}</b>${date ? ` · ${esc(t('officialMap', { date }))}` : ''}</span></li>`;
+  }).join('');
+  return `<div class="official official-${verdict}">${title}
+    <p class="hint">${esc(t('officialIntro', { n: dry, total: judged.length }))}</p>
+    <ul class="src-list official-list">${rows}</ul>
+    <p class="official-verdict">${esc(t(verdict, { ours: ours ? t(`level_${ours}`) : '', theirs: theirs ? t(`level_${theirs}`) : '' }))}
+      <a href="https://drought.emergency.copernicus.eu/" target="_blank" rel="noopener">Copernicus Drought Observatory</a></p>
   </div>`;
 }
 
@@ -831,7 +875,7 @@ async function startMap() {
 
 const layerLabels = () => ({
   satellite: t('layerSatellite'), map: t('layerMap'),
-  overlays: { greenness: t('layerGreenness'), soil: t('layerSoil') },
+  overlays: { greenness: t('layerGreenness'), soil: t('layerSoil'), cdi: t('layerCdi'), gdoSoil: t('layerGdoSoil'), gdoVeg: t('layerGdoVeg') },
   area: { draw: t('areaDraw'), active: t('areaActive'), view: t('areaView'), hint: t('areaHint') },
 });
 

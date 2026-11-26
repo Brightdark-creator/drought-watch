@@ -789,3 +789,14 @@ tr.current { background: var(--accent-soft); }
   .home-search input { flex-basis: 100%; }                      /* the whole placeholder fits */
   .home-search button[type="submit"] { flex: 1; }
 }
+
+/* Official monitors */
+.official { margin-top: 18px; padding: 16px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); }
+.official .sources-title { margin-bottom: 6px; }
+.official .hint { margin: 0 0 12px; }
+.official-list li { grid-template-columns: auto 1fr; }
+.official-list .mini { grid-row: span 2; }
+.official-verdict { margin: 14px 0 0; font-weight: 600; }
+.official-verdict a { margin-left: 4px; font-weight: 500; color: var(--accent); }
+.official-officialAgree { border-left: 4px solid var(--green); }
+.official-officialDisagree { border-left: 4px solid var(--yellow-edge); }

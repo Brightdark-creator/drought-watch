@@ -76,6 +76,10 @@ export async function initMap(container, newHandlers, labels) {
   };
   // Overlays from NASA GIBS (newest picture, tiles need no account): what the
   // satellites see right now, over the whole map. Switched on in the layer box.
+  const gdo = (layer, crs) => L.tileLayer.wms('https://drought.emergency.copernicus.eu/api/wms', {
+    layers: layer, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.75, ...(crs ? { crs } : {}),
+    attribution: '<a href="https://drought.emergency.copernicus.eu/">Copernicus Drought Observatory</a>',
+  });
   const gibs = (layer, matrix, maxNativeZoom, credit) => L.tileLayer(
     `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/default/${matrix}/{z}/{y}/{x}.png`,
     { maxNativeZoom, maxZoom: 18, opacity: 0.7, attribution: `${credit} via <a href="https://www.earthdata.nasa.gov/gibs">NASA GIBS</a>` },
@@ -83,6 +87,10 @@ export async function initMap(container, newHandlers, labels) {
   overlays = {
     greenness: gibs('MODIS_Terra_L3_NDVI_16Day', 'GoogleMapsCompatible_Level9', 9, 'MODIS NDVI 16-day'),
     soil: gibs('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', 'GoogleMapsCompatible_Level6', 6, 'SMAP L4 root-zone soil moisture'),
+    // Official drought maps of the European Commission (Copernicus Global/European Drought Observatory)
+    cdi: gdo('cdiad', L.CRS.EPSG4326), // this layer is only served in degrees
+    gdoSoil: gdo('smang'),
+    gdoVeg: gdo('fpanv'),
   };
   baseName = readBase();
   layers[baseName].addTo(map);
@@ -105,7 +113,10 @@ export function setLayerLabels(labels) {
   setAreaLabels(labels);
   layerControl?.remove();
   const extra = labels.overlays && overlays
-    ? { [labels.overlays.greenness]: overlays.greenness, [labels.overlays.soil]: overlays.soil }
+    ? {
+      [labels.overlays.greenness]: overlays.greenness, [labels.overlays.soil]: overlays.soil,
+      [labels.overlays.cdi]: overlays.cdi, [labels.overlays.gdoSoil]: overlays.gdoSoil, [labels.overlays.gdoVeg]: overlays.gdoVeg,
+    }
     : null;
   layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, extra, { collapsed: true, position: 'topright' }).addTo(map);
 }

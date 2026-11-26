@@ -692,3 +692,86 @@ export async function loadOutlook(lat, lon) {
     tmax: Math.max(...d.temperature_2m_max.filter((v) => v != null)),
   };
 }
+
+/* ---------- Official drought monitors (Copernicus GDO / EDO) ---------- */
+
+/**
+ * The European Commission's Global Drought Observatory publishes its drought
+ * maps as images (WMS) for everyone, but has no "value at this point" service.
+ * So the app downloads a tiny 5 × 5 pixel piece of each map around the place
+ * and reads the colour of the middle pixel. Every colour is one class of the
+ * map's legend (measured from the maps, as of November 2026):
+ */
+const GDO = 'https://drought.emergency.copernicus.eu/api/wms';
+export const OFFICIAL = [
+  // Combined Drought Indicator, Europe only: Watch (rain short) / Warning (soil dry) / Alert (plants hit)
+  { id: 'cdi', layer: 'cdiad', europe: true, emptyMeansNormal: true,
+    classes: { '#f0e442': ['yellow', 'cdiWatch'], '#e69f00': ['red', 'cdiWarning'], '#dc050c': ['red', 'cdiAlert'] } },
+  // Soil moisture anomaly (brown = drier, blue = wetter than normal)
+  { id: 'soil', layer: 'smang',
+    classes: { '#b35806': ['red'], '#f1a340': ['yellow'], '#fee0b6': ['green'], '#ffffff': ['green'], '#d1e5f0': ['green'], '#67a9cf': ['green'], '#2166ac': ['green'] } },
+  // Vegetation anomaly: fAPAR, the share of sunlight the plants use, from the VIIRS satellite
+  { id: 'veg', layer: 'fpanv',
+    classes: { '#d73063': ['red'], '#fc8d95': ['yellow'], '#fee0c7': ['green'], '#ffffff': ['green'], '#afed51': ['green'], '#4ba600': ['green'], '#136f00': ['green'] } },
+  // Groundwater and all stored water, from the GRACE satellites (they weigh the water by its gravity)
+  { id: 'ground', layer: 'twsan',
+    classes: { '#8c510a': ['red'], '#d8b365': ['yellow'], '#f6e8c3': ['green'], '#ffffff': ['green'], '#c7eae5': ['green'], '#5ab4ac': ['green'], '#01665e': ['green'] } },
+];
+const inEurope = (lat, lon) => lat >= 25 && lat <= 72 && lon >= -32 && lon <= 70;
+let gdoDates = null;
+
+/** Newest map date per layer, from the service's description (one small request). */
+function officialDates() {
+  if (!gdoDates) {
+    gdoDates = fetch(`${GDO}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`).then((r) => r.text()).then((xml) => {
+      const dates = {};
+      for (const o of OFFICIAL) {
+        const i = xml.indexOf(`<Name>${o.layer}</Name>`);
+        const part = i < 0 ? '' : xml.slice(i, xml.indexOf('</Layer>', i));
+        const m = part.match(/<Dimension name="time"[^>]*>[^<]*\/(\d{4}-\d{2}-\d{2})\/P/);
+        dates[o.id] = m ? new Date(`${m[1]}T00:00:00Z`) : null;
+      }
+      return dates;
+    }).catch(() => ({}));
+  }
+  return gdoDates;
+}
+
+function nearestClass(rgb, classes) {
+  let best = null;
+  for (const [hex, value] of Object.entries(classes)) {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const d = Math.hypot(c[0] - rgb[0], c[1] - rgb[1], c[2] - rgb[2]);
+    if (!best || d < best.d) best = { d, value };
+  }
+  return best && best.d < 40 ? best.value : null; // not a legend colour: unknown
+}
+
+/** Reads one official map at a place: { id, level, word, date } (level null = no data there). */
+async function readOfficial(o, lat, lon) {
+  if (o.europe && !inEurope(lat, lon)) return { id: o.id, level: null, outside: true };
+  const d = 0.05;
+  const url = `${GDO}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${o.layer}&STYLES=&CRS=EPSG:4326`
+    + `&BBOX=${lat - d},${lon - d},${lat + d},${lon + d}&WIDTH=5&HEIGHT=5&FORMAT=image/png&TRANSPARENT=true`;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = url;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = 5; canvas.height = 5;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(2, 2, 1, 1).data;
+  if (px[3] < 128) return { id: o.id, level: o.emptyMeansNormal ? 'green' : null, word: o.emptyMeansNormal ? 'cdiNone' : null };
+  const hit = nearestClass([px[0], px[1], px[2]], o.classes);
+  return { id: o.id, level: hit?.[0] ?? null, word: hit?.[1] ?? null };
+}
+
+/** All official maps for a place (each one may fail on its own). */
+export async function loadOfficial(lat, lon) {
+  const [dates, ...results] = await Promise.all([
+    officialDates(),
+    ...OFFICIAL.map((o) => readOfficial(o, lat, lon).catch(() => ({ id: o.id, level: null, failed: true }))),
+  ]);
+  return results.map((r) => ({ ...r, date: dates[r.id] ?? null }));
+}
