@@ -675,3 +675,22 @@ tr.current { background: var(--accent-soft); }
 }
 .toggle .label-short { display: none; }
 .ndvi-scale[hidden] { display: none; } /* only with the greenness map */
+
+/* ---------- All sources on the card ---------- */
+.sources-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.sources-title { margin: 0 0 10px; font-size: 1.05rem; font-weight: 750; }
+.src-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.src-list li { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 1px; align-items: center; }
+.src-list .mini { grid-row: span 2; }
+.src-name { font-weight: 600; }
+.src-detail { color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.src-detail b { color: var(--text); font-weight: 600; }
+.sources-panel .hint a { color: var(--accent); font-weight: 600; }
+@media (min-width: 720px) { .src-list { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+.lead-figure { margin: 0 0 14px; font-size: 1.15rem; font-weight: 650; font-stretch: var(--wide); max-width: 60ch; text-wrap: pretty; }
+#agreement td { text-align: left; vertical-align: top; white-space: normal; }
+#agreement td .mini { margin-right: 4px; }
+@media (max-width: 560px) {
+  .area-control button { min-height: 36px; padding: 4px 10px; font-size: 0.8rem; }
+  .area-control .area-view { display: none; } /* phones: draw with a finger; the button stays for bigger screens and keyboards */
+}

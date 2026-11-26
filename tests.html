@@ -27,8 +27,9 @@
   <ul id="results"></ul>
 </main>
 <script type="module">
-  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, peakPeriod, SD_FLOOR } from './js/analysis.js';
-  import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError, keepUpload, restoreKeptUploads, isUploadKept, forgetUpload, loadSeries } from './js/data.js';
+  import { analyseField, seasonAndPeriod, periodStart, warningSince, leadTime, confidence, seasonSummary, checkNormalYears, availableSeasons, peakPeriod, SD_FLOOR, combineLevels } from './js/analysis.js';
+  import { parseCsv, distanceKm, readLocation, readUploadedFile, DataError, keepUpload, restoreKeptUploads, isUploadKept, forgetUpload, loadSeries, areaPoints, areaSizeKm } from './js/data.js';
+  import { t, setVariant } from './js/i18n.js';
 
   const results = [];
   function check(name, condition, detail = '') {
@@ -38,6 +39,23 @@
   const day = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
 
   /* ---------- Calendar ---------- */
+  // Several sources -> one verdict (half or more decides)
+  check('Sources: 2 of 3 red gives red', combineLevels(['red', 'red', 'green']) === 'red');
+  check('Sources: red + yellow + green gives yellow', combineLevels(['red', 'yellow', 'green']) === 'yellow');
+  check('Sources: one red alone among 3 is not enough', combineLevels(['red', 'green', 'green']) === 'green');
+  check('Sources: 1 of 2 red gives red (half is enough)', combineLevels(['red', 'green']) === 'red');
+  check('Sources: off and missing are left out', combineLevels(['off', null, 'unknown', 'yellow']) === 'yellow');
+  check('Sources: nothing judged gives null', combineLevels(['off', null]) === null);
+  // Area sampling: never more than 4 points, one point for a small area
+  check('Area: a 100 × 100 km box gets 4 points', areaPoints({ south: 50, west: 10, north: 50.9, east: 11.4 }).length === 4);
+  check('Area: a 5 km box gets 1 point', areaPoints({ south: 50, west: 10, north: 50.045, east: 10.07 }).length === 1);
+  check('Area: size of 1° latitude is about 111 km', Math.abs(areaSizeKm({ south: 0, west: 0, north: 1, east: 0 }).h - 111.3) < 0.5);
+  // Text variants: live places use "_live" texts where they exist
+  setVariant('live');
+  const liveName = t('ndviName');
+  setVariant('');
+  check('Texts: live variant switches greenness to root-zone water', liveName.startsWith('Root-zone') && t('ndviName').startsWith('Greenness'));
+
   check('1 January is period 0', seasonAndPeriod(day(2018, 1, 1)).period === 0);
   check('10 January is still period 0', seasonAndPeriod(day(2018, 1, 10)).period === 0);
   check('11 January is period 1', seasonAndPeriod(day(2018, 1, 11)).period === 1);

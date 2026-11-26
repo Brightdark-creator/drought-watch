@@ -7,7 +7,7 @@
  *   i18n.js / lang.js  all texts, dates and numbers
  */
 import * as Data from './data.js';
-import { analyseField, availableSeasons, checkNormalYears, peakPeriod, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
+import { analyseField, combineLevels, availableSeasons, checkNormalYears, peakPeriod, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
 import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
   t, setVariant, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
@@ -294,7 +294,11 @@ async function renderCard({ loading = false } = {}) {
   }
   const a = await analysisFor(field);
   const p = state.period;
-  const level = p == null ? 'unknown' : a.overall[p] || 'unknown';
+  // All sources together: the headline is their combined verdict once they are in
+  const sources = evidenceReady(field, a);
+  if (!sources) evidenceFor(field, a).then(() => { if (currentField() === field) renderCard(); }).catch(() => {});
+  const combined = sources && p != null ? combineLevels(sources.map((src) => sourceAt(src, p).level)) : null;
+  const level = p == null ? 'unknown' : combined || a.overall[p] || 'unknown';
   const inSeason = p != null && a.inSeason[p];
 
   // One meter per index: how many standard deviations from normal.
@@ -349,7 +353,85 @@ async function renderCard({ loading = false } = {}) {
       ${confidenceKpi(confidence(a, p))}
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
+    ${sourcesPanel(sources, p)}
     <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+}
+
+/* ---------- All sources together ----------
+   For every place: the satellite pictures (case studies only), ERA5-Land soil
+   water, NASA MERRA-2 soil wetness and NASA rain of the last 90 days. Each is
+   judged by the same rule against the same normal years; combineLevels() turns
+   them into one verdict. */
+const evidence = new Map(); // key -> sources (once loaded)
+const evidenceLoading = new Map();
+
+const evidenceKey = (field, a) => `${field.id}|${a.season}|${field.seasonStartMonth || 1}|${a.normalYears.join(',')}`;
+const evidenceReady = (field, a) => evidence.get(evidenceKey(field, a)) || null;
+
+function evidenceFor(field, a) {
+  const key = evidenceKey(field, a);
+  if (!evidenceLoading.has(key)) {
+    const same = { season: a.season, seasonStartMonth: field.seasonStartMonth || 1, normalYears: a.normalYears, allYear: true };
+    const promise = (async () => {
+      const [era, power] = await Promise.allSettled([
+        field.live ? null : Data.loadLivePlace(field.lat, field.lon),
+        Data.loadPower(field.lat, field.lon),
+      ]);
+      const list = [];
+      if (!field.live) list.push({ id: 'sat', a });
+      if (field.live) list.push({ id: 'era', a });
+      else if (era.status === 'fulfilled') list.push({ id: 'era', a: analyseField({ ...era.value, ...same }, era.value.rows) });
+      if (power.status === 'fulfilled') {
+        list.push({ id: 'merra', a: analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil) });
+        list.push({ id: 'rain', a: analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.value.rain), rain: true });
+      }
+      evidence.set(key, list);
+      return list;
+    })();
+    promise.catch(() => evidenceLoading.delete(key));
+    evidenceLoading.set(key, promise);
+  }
+  return evidenceLoading.get(key);
+}
+
+/** A source's judgement in period p (or the period before, when its newest data is a few days behind). */
+function sourceAt(src, p) {
+  for (const q of [p, p - 1]) {
+    const level = q >= 0 ? src.a.overall[q] : null;
+    if (level) {
+      const zs = [src.a.ndvi.z[q], src.a.ndmi.z[q]].filter((z) => z != null);
+      return { level, q, z: zs.length ? Math.min(...zs) : null, value: src.a.ndvi.values[q], normal: src.a.ndvi.mean[q] };
+    }
+  }
+  return { level: null };
+}
+
+function sourcesPanel(sources, p) {
+  if (p == null) return '';
+  if (!sources) return `<div class="sources-panel"><p class="hint">${esc(t('srcLoading'))}</p></div>`;
+  const rows = sources.map((src) => {
+    const at = sourceAt(src, p);
+    const judged = ['green', 'yellow', 'red'].includes(at.level);
+    const symbol = judged ? at.level : 'off';
+    const word = !at.level ? t('srcNone') : judged ? t(`idx_${at.level}`) : t('idx_off');
+    const detail = [
+      at.z != null && judged ? t('sdValue', { z: formatSigned(at.z) }) : '',
+      src.rain && at.value != null ? t('srcRainMm', { mm: Math.round(at.value), normal: Math.round(at.normal ?? 0) }) : '',
+      at.q != null && at.q !== p ? t('srcPrev') : '',
+    ].filter(Boolean).join(' · ');
+    return `<li><span class="mini lvl-${symbol}" aria-hidden="true">${SYMBOLS[symbol]}</span>
+      <span class="src-name">${esc(t(`src_${src.id}`))}</span>
+      <span class="src-detail"><b>${esc(word)}</b>${detail ? ` · ${esc(detail)}` : ''}</span></li>`;
+  }).join('');
+  const levels = sources.map((src) => sourceAt(src, p).level).filter((l) => ['green', 'yellow', 'red'].includes(l));
+  const dry = levels.filter((l) => l !== 'green').length;
+  return `<div class="sources-panel">
+    <h3 class="sources-title">${esc(t('srcTitle'))}</h3>
+    <ul class="src-list">${rows}</ul>
+    <p class="hint">${esc(levels.length ? t('srcVerdict', { n: dry, total: levels.length }) : t('srcNoneAll'))}
+      <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">NASA POWER</a> ·
+      <a href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5-Land</a></p>
+  </div>`;
 }
 
 /** Links to the reports that describe what really happened (from fields.json). */
@@ -607,6 +689,7 @@ async function startMap() {
 
 const layerLabels = () => ({
   satellite: t('layerSatellite'), map: t('layerMap'),
+  overlays: { greenness: t('layerGreenness'), soil: t('layerSoil') },
   area: { draw: t('areaDraw'), active: t('areaActive'), view: t('areaView'), hint: t('areaHint') },
 });
 

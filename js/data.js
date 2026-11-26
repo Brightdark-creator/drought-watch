@@ -467,3 +467,60 @@ export async function loadLiveArea(b, name = null) {
     rows,
   };
 }
+
+/* ---------- More sources for the same place: NASA POWER ---------- */
+
+/**
+ * A second, independent opinion for any place: NASA's MERRA-2 model (via the
+ * free NASA POWER service, about 50 km squares, 1981 to two days ago).
+ *   soil: root-zone soil wetness (0 = dry, 1 = full), 10-day mean
+ *   rain: rain in the last 90 days (mm), the classic "meteorological drought"
+ *         measure (like the SPI used by weather services)
+ * Both come as rows in the same shape as the other data (value in both slots),
+ * so the same analysis judges them against the same normal years.
+ */
+const POWER = 'https://power.larc.nasa.gov/api/temporal/daily/point';
+const powerCache = new Map();
+
+export async function loadPower(lat, lon) {
+  const id = liveId(lat, lon);
+  if (!powerCache.has(id)) {
+    const today = new Date();
+    const day = (d) => d.toISOString().slice(0, 10).replaceAll('-', '');
+    const url = `${POWER}?parameters=GWETROOT,PRECTOTCORR&community=AG&latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
+      + `&start=${today.getUTCFullYear() - LIVE_YEARS}0101&end=${day(today)}&format=JSON`;
+    const promise = fetch(url).then((r) => {
+      if (!r.ok) throw new DataError('live', { reason: `NASA POWER HTTP ${r.status}` });
+      return r.json();
+    });
+    promise.catch(() => powerCache.delete(id));
+    powerCache.set(id, promise);
+  }
+  const body = await powerCache.get(id);
+  const p = body.properties.parameter;
+  const fill = body.header?.fill_value ?? -999;
+  // Per 10-day period (calendar thirds, the same periods for every season start)
+  const periods = new Map();
+  for (const [ymd, wet] of Object.entries(p.GWETROOT)) {
+    const rain = p.PRECTOTCORR[ymd];
+    const date = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)));
+    const third = Math.min(2, Math.floor((date.getUTCDate() - 1) / 10));
+    const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}-${third}`;
+    const s = periods.get(key) || { date: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1 + third * 10)), wet: 0, nWet: 0, rain: 0, nRain: 0, days: 0 };
+    s.days += 1;
+    if (wet !== fill && wet != null) { s.wet += wet; s.nWet += 1; }
+    if (rain !== fill && rain != null) { s.rain += rain; s.nRain += 1; }
+    periods.set(key, s);
+  }
+  const list = [...periods.values()].sort((a, b) => a.date - b.date);
+  const soil = list.filter((s) => s.nWet >= 5).map((s) => ({ date: s.date, ndvi: s.wet / s.nWet, ndmi: s.wet / s.nWet }));
+  // 90 days ≈ this period and the 8 before it; only when all 9 are (nearly) complete
+  const rain = [];
+  list.forEach((s, i) => {
+    const window = list.slice(Math.max(0, i - 8), i + 1);
+    if (window.length < 9 || window.some((w) => w.nRain < Math.min(8, w.days))) return;
+    const mm = window.reduce((sum, w) => sum + (w.rain / w.nRain) * w.days, 0);
+    rain.push({ date: s.date, ndvi: mm, ndmi: mm });
+  });
+  return { soil, rain, lastDate: list.filter((s) => s.nWet > 0).at(-1)?.date ?? null };
+}

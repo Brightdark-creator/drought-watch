@@ -16,6 +16,7 @@ const pins = new Map(); // field id -> { marker, outline, level }
 let selectedId = null;
 let layers = null;       // { satellite, map } base layers
 let layerControl = null; // the Satellite/Map switch in the corner
+let overlays = null;     // NASA layers: today's greenness and soil moisture
 let baseName = 'satellite';
 
 // Field outline style: white on the satellite picture, dark green on the street map.
@@ -73,6 +74,16 @@ export async function initMap(container, newHandlers, labels) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }),
   };
+  // Overlays from NASA GIBS (newest picture, tiles need no account): what the
+  // satellites see right now, over the whole map. Switched on in the layer box.
+  const gibs = (layer, matrix, maxNativeZoom, credit) => L.tileLayer(
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/default/${matrix}/{z}/{y}/{x}.png`,
+    { maxNativeZoom, maxZoom: 18, opacity: 0.7, attribution: `${credit} via <a href="https://www.earthdata.nasa.gov/gibs">NASA GIBS</a>` },
+  );
+  overlays = {
+    greenness: gibs('MODIS_Terra_L3_NDVI_16Day', 'GoogleMapsCompatible_Level9', 9, 'MODIS NDVI 16-day'),
+    soil: gibs('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', 'GoogleMapsCompatible_Level6', 6, 'SMAP L4 root-zone soil moisture'),
+  };
   baseName = readBase();
   layers[baseName].addTo(map);
   setLayerLabels(labels);
@@ -93,7 +104,10 @@ export function setLayerLabels(labels) {
   if (!map || !labels) return;
   setAreaLabels(labels);
   layerControl?.remove();
-  layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, null, { collapsed: false, position: 'topright' }).addTo(map);
+  const extra = labels.overlays && overlays
+    ? { [labels.overlays.greenness]: overlays.greenness, [labels.overlays.soil]: overlays.soil }
+    : null;
+  layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, extra, { collapsed: true, position: 'topright' }).addTo(map);
 }
 
 export function isMapReady() {

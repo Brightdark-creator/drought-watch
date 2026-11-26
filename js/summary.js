@@ -5,7 +5,7 @@
  * leaf water warned before greenness, and the lowest anomalies.
  */
 import * as Data from './data.js';
-import { analyseField, seasonSummary, checkNormalYears, SYMBOLS } from './analysis.js';
+import { analyseField, seasonSummary, checkNormalYears, combineLevels, SYMBOLS } from './analysis.js';
 import { timelineHtml } from './visuals.js';
 import { t, pick, setLanguage, applyStaticTexts, formatDate, formatSigned, formatList } from './i18n.js';
 
@@ -34,6 +34,8 @@ async function init() {
     }));
     return { field, a, s: seasonSummary(a), nearby: nearby.filter(Boolean) };
   }));
+
+  renderAgreement(results.filter((r) => r.field.event && !r.field.simulated));
 
   const day = (a, p) => (p == null ? '–' : esc(formatDate(a.dates[p], { day: 'numeric', month: 'short' })));
   const zAt = (a, low) => (low == null ? '–' : `${esc(t('sdValue', { z: formatSigned(low.z) }))}<br><small>${day(a, low.period)}</small>`);
@@ -123,3 +125,58 @@ init().catch((error) => {
   console.error(error);
   $('overview').textContent = t('loadError');
 });
+
+
+/**
+ * Do other sources agree? For each drought: the satellite verdict at the worst
+ * moment of the season (the first red, else the lowest point) next to NASA's
+ * MERRA-2 soil wetness and NASA rain of the last 90 days for the same place,
+ * season and normal years, and the combined verdict of all three.
+ */
+async function renderAgreement(results) {
+  const box = $('agreement');
+  if (!box) return;
+  box.innerHTML = `<p class="hint">${esc(t('srcLoading'))}</p>`;
+  const cell = (level, z) => {
+    const l = ['green', 'yellow', 'red'].includes(level) ? level : 'off';
+    return `<td><span class="mini lvl-${l}" aria-hidden="true">${SYMBOLS[l]}</span> ${esc(level ? t(`idx_${level}`) : t('srcNone'))}${z != null ? `<br><small>${esc(t('sdValue', { z: formatSigned(z) }))}</small>` : ''}</td>`;
+  };
+  const rows = await Promise.all(results.map(async ({ field, a, s }) => {
+    const p = s.firstRed ?? lowestPeriod(a);
+    const same = { season: a.season, seasonStartMonth: field.seasonStartMonth || 1, normalYears: a.normalYears, allYear: true };
+    let soil = null;
+    let rain = null;
+    try {
+      const power = await Data.loadPower(field.lat, field.lon);
+      soil = analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.soil);
+      rain = analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.rain);
+    } catch { /* offline: the row shows "no data" */ }
+    const at = (x) => (x && p != null ? { level: x.overall[p], z: x.ndvi.z[p] } : { level: null, z: null });
+    const sat = { level: a.overall[p], z: p == null ? null : Math.min(...[a.ndvi.z[p], a.ndmi.z[p]].filter((z) => z != null)) };
+    const all = [sat, at(soil), at(rain)];
+    const combined = combineLevels(all.map((x) => x.level));
+    return { field, a, p, all, combined };
+  }));
+  const agree = rows.filter((r) => r.combined === 'red').length;
+  box.innerHTML = `
+    <p class="lead-figure">${esc(t('agreeHeadline', { n: agree, total: rows.length }))}</p>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="${esc(t('agreeTitle'))}"><table>
+      <thead><tr><th scope="col">${esc(t('colField'))}</th><th scope="col">${esc(t('agreeWhen'))}</th>
+        <th scope="col">${esc(t('src_sat'))}</th><th scope="col">${esc(t('src_merra'))}</th><th scope="col">${esc(t('src_rain'))}</th><th scope="col">${esc(t('agreeCombined'))}</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><th scope="row">${esc(pick(r.field.short))}</th>
+        <td>${r.p == null ? '–' : esc(formatDate(r.a.dates[r.p] || r.a.labels[r.p], { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
+        ${r.all.map((x) => cell(x.level, x.z)).join('')}${cell(r.combined, null)}</tr>`).join('')}</tbody>
+    </table></div>
+    <p class="hint">${esc(t('agreeNote'))}</p>`;
+}
+
+/** The period with the lowest value of the worse index (when the season never turned red). */
+function lowestPeriod(a) {
+  let best = null;
+  a.overall.forEach((level, p) => {
+    if (!a.inSeason[p]) return;
+    const z = Math.min(...[a.ndvi.z[p], a.ndmi.z[p]].filter((v) => v != null));
+    if (Number.isFinite(z) && (best == null || z < best.z)) best = { p, z };
+  });
+  return best?.p ?? null;
+}

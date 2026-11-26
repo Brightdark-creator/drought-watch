@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Results for all fields</title>
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/summary.js"></script>
 </head>
@@ -36,6 +39,11 @@
       <p class="hint" data-i18n="summaryColumns"></p>
     </section>
 
+    <!-- Do other, independent sources show the same drought? -->
+    <section class="panel">
+      <h2 data-i18n="agreeTitle"></h2>
+      <div id="agreement"></div>
+    </section>
     <section>
       <h2 data-i18n="summaryFields"></h2>
       <div id="fields" class="field-cards"></div>

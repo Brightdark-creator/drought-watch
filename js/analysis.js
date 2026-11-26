@@ -456,3 +456,25 @@ export function warningSince(result, p) {
   }
   return start;
 }
+
+/* ---------- Several sources, one verdict ---------- */
+
+/**
+ * Combines the levels of several independent sources for the same period
+ * ("convergence of evidence", as drought monitors do it): a level counts when
+ * at least half of the sources that have a judgement reach it or worse.
+ *   [red, red, green]        -> red     (2 of 3 are red)
+ *   [red, yellow, green]     -> yellow  (2 of 3 are yellow or worse)
+ *   [red, green, green]      -> green   (one source alone is not enough)
+ *   [red, green]             -> red     (half is enough: better a check too many)
+ * Sources with no judgement (no data, outside the season) are left out.
+ * Returns null when no source has a judgement.
+ */
+export function combineLevels(levels) {
+  const judged = levels.filter((l) => l === 'green' || l === 'yellow' || l === 'red');
+  if (judged.length === 0) return null;
+  const atLeast = (rank) => judged.filter((l) => RANK[l] >= rank).length;
+  if (atLeast(RANK.red) * 2 >= judged.length) return 'red';
+  if (atLeast(RANK.yellow) * 2 >= judged.length) return 'yellow';
+  return 'green';
+}
