@@ -318,21 +318,15 @@ export function liveId(lat, lon) {
 export async function loadLivePlace(lat, lon, name = null) {
   const id = liveId(lat, lon);
   if (!liveCache.has(id)) {
-    const today = new Date();
-    const start = `${today.getUTCFullYear() - LIVE_YEARS}-01-01`;
-    const url = `${OPEN_METEO}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&start_date=${start}`
-      + `&end_date=${today.toISOString().slice(0, 10)}&daily=soil_moisture_0_to_7cm_mean,soil_moisture_0_to_100cm_mean&timezone=GMT`;
-    const promise = fetch(url).then(async (response) => {
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new DataError(response.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${response.status}` });
-      return body;
-    });
+    const promise = remembered(`era.${id}`, () => fetchEra(lat, lon))
+      // ERA5 busy (only a few places per minute) or unreachable: carry on with NASA's soil data
+      .catch((error) => (error.code === 'liveEmpty' ? Promise.reject(error) : powerSoil(lat, lon)));
     promise.catch(() => liveCache.delete(id));
     liveCache.set(id, promise);
   }
   const body = await liveCache.get(id);
   const startMonth = lat < 0 ? 7 : 1; // southern hemisphere: seasons run July to June
-  const rows = liveRows(body.daily, startMonth);
+  const rows = body.rows;
   if (rows.length < 36 * 4) throw new DataError('liveEmpty');
   const seasons = [...new Set(rows.map((r) => seasonAndPeriod(r.date, startMonth).season))].sort((a, b) => a - b);
   const season = seasons[seasons.length - 1];
@@ -345,17 +339,63 @@ export async function loadLivePlace(lat, lon, name = null) {
     seasonStartMonth: startMonth,
     normalYears: seasons.filter((s) => s < season).slice(-LIVE_NORMAL_YEARS),
     allYear: true,     // a soil drought counts in every month, not only in the growing season
+    model: body.model, // 'era' normally, 'merra' when ERA5 was busy
     sdFloor: 0.005,    // m³/m³: below this the soil-water swings are model noise
-    gridKm: 9,
+    gridKm: body.model === 'merra' ? 50 : 9,
     sources: [
       { title: 'Open-Meteo Historical Weather API (ERA5-Land)', url: 'https://open-meteo.com/en/docs/historical-weather-api' },
       { title: 'ERA5-Land, Copernicus Climate Change Service', url: 'https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land' },
     ],
     elevation: body.elevation,
     // The model cell (about 9 km) as an outline on the map: the value is for this whole square
-    polygon: square(body.latitude ?? lat, body.longitude ?? lon, 9),
+    polygon: square(body.latitude ?? lat, body.longitude ?? lon, body.model === 'merra' ? 50 : 9),
     rows,
   };
+}
+
+async function fetchEra(lat, lon) {
+  const today = new Date();
+  const start = `${today.getUTCFullYear() - LIVE_YEARS}-01-01`;
+  const url = `${OPEN_METEO}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&start_date=${start}`
+    + `&end_date=${today.toISOString().slice(0, 10)}&daily=soil_moisture_0_to_7cm_mean,soil_moisture_0_to_100cm_mean&timezone=GMT`;
+  const response = await fetch(url);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new DataError(response.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${response.status}` });
+  const rows = liveRows(body.daily, 1);
+  if (rows.length < 36 * 4) throw new DataError('liveEmpty');
+  return { model: 'era', rows, latitude: body.latitude, longitude: body.longitude, elevation: body.elevation };
+}
+
+/** NASA MERRA-2 surface and root-zone wetness in the same two slots (the fallback). */
+async function powerSoil(lat, lon) {
+  const power = await loadPower(lat, lon);
+  if (power.soilPair.length < 36 * 4) throw new DataError('liveEmpty');
+  return { model: 'merra', rows: power.soilPair, latitude: lat, longitude: lon };
+}
+
+/**
+ * Keeps a download on this device for 12 hours (localStorage), so opening the
+ * same place again, or sharing its link, costs nothing. Rows are stored with
+ * their dates as numbers. If storage is full or blocked, it simply downloads.
+ */
+const KEEP_MS = 12 * 3600 * 1000;
+async function remembered(key, load) {
+  const storeKey = `dw.c.${key}`;
+  try {
+    const kept = JSON.parse(localStorage.getItem(storeKey) || 'null');
+    if (kept && Date.now() - kept.t < KEEP_MS) {
+      return { ...kept.v, rows: kept.v.rows.map(([d, a, b, f]) => ({ date: new Date(d), ndvi: a, ndmi: b, ...(f != null ? { flow: f } : {}) })) };
+    }
+  } catch { /* private window or damaged entry: download */ }
+  const value = await load();
+  try {
+    const rows = value.rows.map((r) => [r.date.getTime(), +r.ndvi.toFixed(5), +r.ndmi.toFixed(5), r.flow != null ? +r.flow.toFixed(4) : null]);
+    localStorage.setItem(storeKey, JSON.stringify({ t: Date.now(), v: { ...value, rows } }));
+  } catch {
+    // Storage full: drop our old entries and carry on without keeping this one
+    try { Object.keys(localStorage).filter((k) => k.startsWith('dw.c.')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ }
+  }
+  return value;
 }
 
 /** Daily values -> one row per 10-day period (mean), in the shape the analysis expects. */
@@ -487,7 +527,7 @@ export async function loadPower(lat, lon) {
   if (!powerCache.has(id)) {
     const today = new Date();
     const day = (d) => d.toISOString().slice(0, 10).replaceAll('-', '');
-    const url = `${POWER}?parameters=GWETROOT,PRECTOTCORR,T2M_MAX,T2M_MIN&community=AG&latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
+    const url = `${POWER}?parameters=GWETROOT,GWETTOP,PRECTOTCORR,T2M_MAX,T2M_MIN&community=AG&latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
       + `&start=${today.getUTCFullYear() - LIVE_YEARS}0101&end=${day(today)}&format=JSON`;
     const promise = fetch(url).then((r) => {
       if (!r.ok) throw new DataError('live', { reason: `NASA POWER HTTP ${r.status}` });
@@ -510,6 +550,7 @@ export async function loadPower(lat, lon) {
     days.push({
       date,
       wet: ok(p.GWETROOT[ymd]) ? p.GWETROOT[ymd] : null,
+      top: ok(p.GWETTOP[ymd]) ? p.GWETTOP[ymd] : null,
       rain: ok(p.PRECTOTCORR[ymd]) ? p.PRECTOTCORR[ymd] : null,
       tmax: ok(tmax) ? tmax : null,
       et0: ok(tmax) && ok(tmin) ? hargreaves(lat, date, tmax, tmin) : null,
@@ -521,9 +562,9 @@ export async function loadPower(lat, lon) {
   for (const d of days) {
     const third = Math.min(2, Math.floor((d.date.getUTCDate() - 1) / 10));
     const key = `${d.date.getUTCFullYear()}-${d.date.getUTCMonth()}-${third}`;
-    const s = periods.get(key) || { date: new Date(Date.UTC(d.date.getUTCFullYear(), d.date.getUTCMonth(), 1 + third * 10)), days: 0, wet: [], rain: [], et0: [], tmax: [] };
+    const s = periods.get(key) || { date: new Date(Date.UTC(d.date.getUTCFullYear(), d.date.getUTCMonth(), 1 + third * 10)), days: 0, wet: [], top: [], rain: [], et0: [], tmax: [] };
     s.days += 1;
-    for (const k of ['wet', 'rain', 'et0', 'tmax']) if (d[k] != null) s[k].push(d[k]);
+    for (const k of ['wet', 'top', 'rain', 'et0', 'tmax']) if (d[k] != null) s[k].push(d[k]);
     periods.set(key, s);
   }
   const list = [...periods.values()].sort((a, b) => a.date - b.date);
@@ -533,6 +574,8 @@ export async function loadPower(lat, lon) {
   const row = (date, v) => ({ date, ndvi: v, ndmi: v });
 
   const soil = list.filter((s) => s.wet.length >= 5).map((s) => row(s.date, mean(s.wet)));
+  // Surface (top 5 cm) and root zone, like ERA5's topsoil and root zone: used when ERA5 is busy
+  const soilPair = list.filter((s) => s.wet.length >= 5 && s.top.length >= 5).map((s) => ({ date: s.date, ndvi: mean(s.wet), ndmi: mean(s.top) }));
   const rain = [];
   const balance = [];
   const heat = [];
@@ -565,7 +608,7 @@ export async function loadPower(lat, lon) {
     return totals.length ? mean(totals) : null;
   };
 
-  return { soil, rain, balance, heat, normalRain, lastDate: list.filter((s) => s.wet.length).at(-1)?.date ?? null };
+  return { soil, soilPair, rain, balance, heat, normalRain, lastDate: list.filter((s) => s.wet.length).at(-1)?.date ?? null };
 }
 
 /**
@@ -599,18 +642,20 @@ const riverCache = new Map();
 export async function loadRiver(lat, lon) {
   const id = liveId(lat, lon);
   if (!riverCache.has(id)) {
-    const today = new Date();
-    const url = `${FLOOD}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=river_discharge`
-      + `&start_date=${today.getUTCFullYear() - LIVE_YEARS}-01-01&end_date=${today.toISOString().slice(0, 10)}`;
-    const promise = fetch(url).then(async (r) => {
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok) throw new DataError(r.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${r.status}` });
-      return body;
-    });
+    const promise = remembered(`river.${id}`, () => fetchRiver(lat, lon));
     promise.catch(() => riverCache.delete(id));
     riverCache.set(id, promise);
   }
-  const body = await riverCache.get(id);
+  return (await riverCache.get(id)).rows;
+}
+
+async function fetchRiver(lat, lon) {
+  const today = new Date();
+  const url = `${FLOOD}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=river_discharge`
+    + `&start_date=${today.getUTCFullYear() - LIVE_YEARS}-01-01&end_date=${today.toISOString().slice(0, 10)}`;
+  const r = await fetch(url);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new DataError(r.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${r.status}` });
   const sums = new Map();
   body.daily.time.forEach((day, i) => {
     const q = body.daily.river_discharge[i];
@@ -626,7 +671,7 @@ export async function loadRiver(lat, lon) {
     .map((s) => { const v = Math.log10(s.q / s.n + 0.01); return { date: s.date, ndvi: v, ndmi: v, flow: s.q / s.n }; })
     .sort((a, b) => a.date - b.date);
   if (rows.length < 36 * 4 || rows.every((r) => r.flow < 0.001)) throw new DataError('liveEmpty');
-  return rows;
+  return { rows };
 }
 
 /* ---------- The next 16 days (weather forecast, via Open-Meteo) ---------- */

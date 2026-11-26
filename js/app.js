@@ -361,7 +361,7 @@ async function renderCard({ loading = false } = {}) {
     ${sourcesPanel(sources, p, a)}
     ${outlookPanel(field, a, p, level)}
     ${calcPanel(sources, p, a, level)}
-    <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+    <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t(field.model === 'merra' ? 'liveSourceNasa' : 'liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
 
 /* ---------- All sources together ----------
@@ -389,9 +389,9 @@ function evidenceFor(field, a) {
       // Causes: rain, the water balance and heat. They explain it (and would count twice).
       const list = [];
       if (!field.live) list.push({ id: 'sat', group: 'sign', a, pair: true });
-      if (field.live) list.push({ id: 'era', group: 'sign', a, pair: true });
+      if (field.live) list.push({ id: field.model === 'merra' ? 'merra' : 'era', group: 'sign', a, pair: true });
       else if (era.status === 'fulfilled') list.push({ id: 'era', group: 'sign', a: analyseField({ ...era.value, ...same }, era.value.rows), pair: true });
-      if (power.status === 'fulfilled') list.push({ id: 'merra', group: 'sign', a: analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil) });
+      if (power.status === 'fulfilled' && field.model !== 'merra') list.push({ id: 'merra', group: 'sign', a: analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil) });
       if (river.status === 'fulfilled') list.push({ id: 'river', group: 'sign', a: analyseField({ id: 'river', ...same, sdFloor: 0.05 }, river.value), unit: 'flow' });
       if (power.status === 'fulfilled') {
         list.push({ id: 'rain', group: 'cause', a: analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.value.rain), unit: 'mm' });
