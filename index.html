@@ -30,7 +30,7 @@
         </a>
         <div class="home-links">
           <a href="check.html" data-i18n="navMap">Map</a>
-          <a href="#cases" data-i18n="navCases">Case studies</a>
+          <a href="#cases" data-i18n="navCases">Regions</a>
           <a href="summary.html" data-i18n="navResults">Results</a>
           <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
           <select id="lang"></select>
@@ -53,16 +53,11 @@
           </p>
         </div>
 
-        <!-- Real Sentinel-2 pictures of the same farmland: a normal summer and the 2018 drought -->
-        <figure class="home-pair">
-          <div class="home-pair-img">
-            <img src="data/images/it-mantova-normal-rgb.jpg" width="400" height="400" alt="" data-i18n-alt="homeImgNormal">
-            <span class="home-tag" data-i18n="homeTagNormal">Normal summer</span>
-          </div>
-          <div class="home-pair-img">
-            <img src="data/images/it-mantova-drought-rgb.jpg" width="400" height="400" alt="" data-i18n-alt="homeImgDrought">
-            <span class="home-tag dry" data-i18n="homeTagDrought">Drought, 2022</span>
-          </div>
+        <!-- The newest NASA MODIS greenness picture of the whole Earth (16-day composite, always the latest) -->
+        <figure class="home-world">
+          <img src="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&amp;REQUEST=GetMap&amp;VERSION=1.3.0&amp;LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_NDVI_16Day&amp;STYLES=&amp;CRS=EPSG:4326&amp;BBOX=-60,-180,85,180&amp;WIDTH=1200&amp;HEIGHT=483&amp;FORMAT=image/jpeg&amp;TIME=default"
+            width="1200" height="483" alt="" data-i18n-alt="homeWorldAlt">
+          <span class="home-tag" data-i18n="homeWorldTag">Greenness now, NASA MODIS</span>
         </figure>
       </div>
     </div>
@@ -104,7 +99,7 @@
               <div><dt data-i18n="homeDetail"></dt><dd data-i18n="homeSatDetail"></dd></div>
               <div><dt data-i18n="homeFresh"></dt><dd data-i18n="homeSatFresh"></dd></div>
             </dl>
-            <a class="home-button secondary" href="#cases" data-i18n="homeSeeCases">See the case studies</a>
+            <a class="home-button secondary" href="check.html" data-i18n="homeSeeCases">See them on the map</a>
           </article>
         </div>
       </div>
@@ -113,7 +108,7 @@
     <!-- Case studies: filled from data/fields.json by js/home.js -->
     <section class="home-section" id="cases">
       <div class="home-wrap">
-        <h2 data-i18n="homeCasesTitle">Six real droughts, seen from space</h2>
+        <h2 data-i18n="homeCasesTitle">Farm regions to check now</h2>
         <p class="home-intro" data-i18n="homeCasesIntro"></p>
         <ul id="home-cases" class="home-cases"></ul>
       </div>

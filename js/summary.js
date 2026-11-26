@@ -146,15 +146,18 @@ async function renderAgreement(results) {
     const same = { season: a.season, seasonStartMonth: field.seasonStartMonth || 1, normalYears: a.normalYears, allYear: true };
     let soil = null;
     let rain = null;
-    try {
-      const power = await Data.loadPower(field.lat, field.lon);
-      soil = analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.soil);
-      rain = analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.rain);
-    } catch { /* offline: the row shows "no data" */ }
+    let river = null;
+    const [power, flow] = await Promise.allSettled([Data.loadPower(field.lat, field.lon), Data.loadRiver(field.lat, field.lon)]);
+    if (power.status === 'fulfilled') {
+      soil = analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil);
+      rain = analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.value.rain);
+    }
+    if (flow.status === 'fulfilled') river = analyseField({ id: 'river', ...same, sdFloor: 0.05 }, flow.value);
     const at = (x) => (x && p != null ? { level: x.overall[p], z: x.ndvi.z[p] } : { level: null, z: null });
     const sat = { level: a.overall[p], z: p == null ? null : Math.min(...[a.ndvi.z[p], a.ndmi.z[p]].filter((z) => z != null)) };
-    const all = [sat, at(soil), at(rain)];
-    const combined = combineLevels(all.map((x) => x.level));
+    // Signs vote (satellite, soil, river); rain is shown as the cause, as on the map
+    const all = [sat, at(soil), at(river), at(rain)];
+    const combined = combineLevels(all.slice(0, 3).map((x) => x.level));
     return { field, a, p, all, combined };
   }));
   const agree = rows.filter((r) => r.combined === 'red').length;
@@ -162,7 +165,7 @@ async function renderAgreement(results) {
     <p class="lead-figure">${esc(t('agreeHeadline', { n: agree, total: rows.length }))}</p>
     <div class="table-wrap" tabindex="0" role="region" aria-label="${esc(t('agreeTitle'))}"><table>
       <thead><tr><th scope="col">${esc(t('colField'))}</th><th scope="col">${esc(t('agreeWhen'))}</th>
-        <th scope="col">${esc(t('src_sat'))}</th><th scope="col">${esc(t('src_merra'))}</th><th scope="col">${esc(t('src_rain'))}</th><th scope="col">${esc(t('agreeCombined'))}</th></tr></thead>
+        <th scope="col">${esc(t('src_sat'))}</th><th scope="col">${esc(t('src_merra'))}</th><th scope="col">${esc(t('src_river'))}</th><th scope="col">${esc(t('src_rain'))} *</th><th scope="col">${esc(t('agreeCombined'))}</th></tr></thead>
       <tbody>${rows.map((r) => `<tr><th scope="row">${esc(pick(r.field.short))}</th>
         <td>${r.p == null ? '–' : esc(formatDate(r.a.dates[r.p] || r.a.labels[r.p], { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
         ${r.all.map((x) => cell(x.level, x.z)).join('')}${cell(r.combined, null)}</tr>`).join('')}</tbody>

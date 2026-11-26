@@ -11,11 +11,11 @@
  */
 
 const COLORS = {
-  season: '#1c2321',
-  band: 'rgba(110, 120, 116, 0.22)',
-  mean: '#6e7874',
+  season: '#12251c',
+  band: 'rgba(47, 125, 80, 0.16)',   // the normal range: soft green, "where this field usually is"
+  mean: '#2f7d50',
   compare: '#2563eb',
-  grid: 'rgba(0, 0, 0, 0.07)',
+  grid: 'rgba(18, 37, 28, 0.06)',
   selected: '#12251c',
   offSeason: 'rgba(28, 35, 33, 0.045)',
 };
@@ -110,7 +110,7 @@ export class IndexChart {
         label: d.texts.season,
         data: d.values,
         borderColor: COLORS.season,
-        borderWidth: 3,
+        borderWidth: 2.5,
         // Each piece of the line takes the colour of the level at its end,
         // so the line turns yellow/red where the warning is.
         segment: { borderColor: (ctx) => LINE_COLORS[levels[ctx.p1DataIndex]] || COLORS.season },
@@ -128,7 +128,7 @@ export class IndexChart {
         data: d.mean,
         borderColor: COLORS.mean,
         borderWidth: 1.5,
-        borderDash: [6, 4],
+        borderDash: [5, 4],
         pointRadius: 0,
         order: 2,
         isMean: true,
@@ -162,6 +162,7 @@ export class IndexChart {
     const options = {
       responsive: true,
       maintainAspectRatio: false,
+      elements: { line: { tension: 0.3 } }, // gentle curves; the band edges bend the same way
       animation: false,
       locale: d.locale,
       interaction: { mode: 'index', intersect: false },

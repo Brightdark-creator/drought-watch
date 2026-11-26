@@ -431,8 +431,8 @@ body.no-map .card { margin-top: 16px; box-shadow: var(--shadow); }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
 .legend .shapes { flex-basis: 100%; }
 .key { display: inline-block; width: 22px; height: 0; border-top: 3px solid var(--text); }
-.key-band { height: 12px; border: none; background: rgba(110, 120, 116, 0.3); border-radius: 2px; }
-.key-mean { border-top: 2px dashed #6e7874; }
+.key-band { height: 12px; border: none; background: rgba(47, 125, 80, 0.22); border-radius: 2px; }
+.key-mean { border-top: 2px dashed #2f7d50; }
 .key-compare { border-top-color: #2563eb; }
 
 /* ---------- Table, explanations, footer ---------- */
@@ -694,3 +694,90 @@ tr.current { background: var(--accent-soft); }
   .area-control button { min-height: 36px; padding: 4px 10px; font-size: 0.8rem; }
   .area-control .area-view { display: none; } /* phones: draw with a finger; the button stays for bigger screens and keyboards */
 }
+
+/* ---------- Card graphics (round 9) ----------
+   The gauge replaces the plant: it shows the actual number the verdict rests on.
+   Every source row has the same small z-bar, so they can be compared at a glance. */
+.card-gauge { width: 150px; height: auto; display: grid; justify-items: center; align-content: start; }
+.gauge { width: 150px; height: auto; display: block; overflow: visible; }
+.gauge-symbol { font: 800 15px/1 var(--font); fill: #12251c; }
+.gauge-red { fill: var(--red); }
+.gauge-yellow { fill: #8a6a00; }
+.gauge-green { fill: var(--green); }
+.gauge-needle { transform-origin: 60px 62px; }
+.card.is-entering .gauge-needle { animation: sweep 800ms var(--ease-in-out) 120ms both; }
+@keyframes sweep { from { transform: rotate(var(--a)); } }   /* from straight up (normal-ish) to the value */
+.gauge-value { margin-top: -2px; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.sources-panel { display: grid; gap: 22px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.src-group .hint { margin: 0 0 12px; }
+.src-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: 1fr; }
+.src-list li { display: grid; grid-template-columns: auto 1fr auto; column-gap: 10px; row-gap: 4px; align-items: center; }
+.src-list .mini { grid-row: span 3; align-self: start; margin-top: 1px; }
+.src-name { font-weight: 650; font-size: 0.95rem; line-height: 1.3; }
+.src-z { font-weight: 750; font-variant-numeric: tabular-nums; font-size: 0.95rem; white-space: nowrap; }
+.zbar { grid-column: 2 / 4; position: relative; height: 8px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--red-soft) 0 33.3%, var(--yellow-soft) 33.3% 50%, var(--green-soft) 50% 100%); }
+.zbar-mark { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); background: var(--off); }
+.zbar-mark.lvl-yellow { box-shadow: 0 0 0 1.5px var(--yellow-edge), 0 1px 3px rgba(0, 0, 0, 0.35); }
+.src-list .src-detail { grid-column: 2 / 4; }
+.zscale { position: relative; height: 16px; margin: 6px 0 0 34px; font-size: 0.72rem; color: var(--muted); }
+.zscale span { position: absolute; transform: translateX(-50%); }
+.src-links { margin: 0; }
+.src-links a { color: var(--accent); font-weight: 600; }
+.loading-line::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; vertical-align: -1px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Outlook: three figures and one sentence */
+.outlook { margin-top: 22px; padding: 16px 18px; border-radius: var(--radius-sm); background: var(--panel); border-left: 4px solid var(--rule); }
+.outlook-outlookWorse, .outlook-outlookWatch { border-left-color: var(--red); }
+.outlook-outlookEase { border-left-color: var(--green); }
+.outlook .sources-title { margin-bottom: 10px; }
+.outlook-figures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.outlook-figures p { margin: 0; display: grid; gap: 2px; }
+.outlook-figures b { font-size: 1.35rem; font-stretch: var(--wide); font-variant-numeric: tabular-nums; }
+.outlook-figures span { font-size: 0.8rem; color: var(--muted); line-height: 1.3; }
+.outlook-verdict { margin: 12px 0 0; font-weight: 600; }
+
+/* How this was calculated */
+.calc { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 10px; }
+.calc summary { display: flex; justify-content: space-between; align-items: center; min-height: 44px; font-weight: 700; font-stretch: var(--wide); cursor: pointer; list-style: none; }
+.calc summary::-webkit-details-marker { display: none; }
+.calc summary::after { content: "+"; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--rule); border-radius: 50%; transition: transform 200ms var(--ease-out); }
+.calc[open] summary::after { transform: rotate(45deg); }
+.calc-steps { margin: 6px 0 4px; padding-left: 1.3em; display: grid; gap: 10px; max-width: 76ch; font-size: 0.93rem; }
+.calc-lines { margin: 8px 0 0; padding-left: 1.1em; display: grid; gap: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.calc-lines b { color: var(--text); font-weight: 600; }
+
+/* Season grid: sources × periods */
+.grid-rows { display: grid; gap: 4px; overflow-x: auto; }
+.grid-row { display: grid; grid-template-columns: 7.5rem repeat(36, minmax(0, 1fr)); gap: 2px; align-items: center; min-width: 520px; }
+.grid-label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; }
+.grid-combined .grid-label { color: var(--text); font-weight: 700; }
+.grid-combined .cell { height: 26px; }
+.cell { height: 18px; border-radius: 3px; background: var(--border); display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; cursor: pointer; transform-origin: bottom; transition: opacity 150ms ease; }
+.cell-green { background: var(--green); }
+.cell-yellow { background: var(--yellow); color: var(--yellow-text); box-shadow: inset 0 0 0 1px var(--yellow-edge); }
+.cell-red { background: var(--red); }
+.cell-off { background: #c9d1c8; }
+.cell-none { background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
+.cell.future { opacity: 0.25; }
+.cell.current { outline: 2px solid var(--text); outline-offset: 1px; }
+.grid-months { font-size: 0.72rem; color: var(--muted); }
+.grid-months span { white-space: nowrap; overflow: hidden; }
+.timeline.is-entering .cell { animation: grow 420ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 14ms + 200ms); }
+@media (hover: hover) and (pointer: fine) { .cell:hover { opacity: 0.8; } }
+@media (min-width: 720px) {
+  .sources-panel { grid-template-columns: 1fr 1fr; column-gap: 36px; }
+  .sources-panel .src-links { grid-column: 1 / -1; }
+  .src-list { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .card-gauge, .gauge { width: 92px; }
+  .card-head { grid-template-columns: 92px 1fr; }
+  .outlook-figures b { font-size: 1.1rem; }
+}
+.home-world { position: relative; margin: 0; align-self: center; }
+.home-world img { display: block; width: 100%; height: auto; border-radius: var(--radius-xs); background: #1d2b25; }
+.home-world .home-tag { background: rgba(13, 30, 22, 0.85); }
+.chips-row:has(.chips:empty) .chips-label { display: none; } /* no places opened yet */

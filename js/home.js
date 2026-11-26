@@ -4,7 +4,6 @@
  * warning level each one reached, worked out by the same analysis as the map).
  */
 import * as Data from './data.js';
-import { analyseField, SYMBOLS } from './analysis.js';
 import { t, pick, setLanguage, applyStaticTexts, LANGUAGES } from './i18n.js';
 import { STRINGS } from './lang.js';
 
@@ -24,25 +23,14 @@ function render() {
   renderCases();
 }
 
-/** One row per case study: level symbol, place, year, what happened. Links open it on the map. */
-async function renderCases() {
-  const list = $('home-cases');
-  list.innerHTML = fields.map((f) => `
-    <li><a href="check.html?field=${encodeURIComponent(f.id)}">
-      <span class="mini lvl-off" data-level="${esc(f.id)}" aria-hidden="true">${SYMBOLS.off}</span>
-      <span class="home-case-name"><b>${esc(pick(f.short))}</b></span>
-      <span class="home-case-event">${esc(pick(f.event) || '')}</span>
+/** Farm regions to check now: each link opens the CURRENT year for that place (live data). */
+function renderCases() {
+  $('home-cases').innerHTML = fields.map((f) => `
+    <li><a href="check.html?lat=${f.lat.toFixed(4)}&amp;lon=${f.lon.toFixed(4)}">
+      <span class="mini lvl-off" aria-hidden="true">→</span>
+      <span class="home-case-name"><b>${esc(pick(f.name))}</b></span>
+      <span class="home-case-event">${esc(t('homeCheckNow'))}</span>
     </a></li>`).join('');
-  // Fill in the level each field reached at its worst moment (same rule as the map)
-  for (const f of fields) {
-    Data.loadSeries(f).then((rows) => {
-      const a = analyseField(f, rows);
-      // The worst level the season reached (same order as the traffic light)
-      const level = ['red', 'yellow', 'green'].find((l) => a.overall.includes(l)) || 'off';
-      const el = list.querySelector(`[data-level="${CSS.escape(f.id)}"]`);
-      if (el) { el.className = `mini lvl-${level}`; el.textContent = SYMBOLS[level]; }
-    }).catch(() => {});
-  }
 }
 
 async function init() {

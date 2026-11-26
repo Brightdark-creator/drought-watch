@@ -487,7 +487,7 @@ export async function loadPower(lat, lon) {
   if (!powerCache.has(id)) {
     const today = new Date();
     const day = (d) => d.toISOString().slice(0, 10).replaceAll('-', '');
-    const url = `${POWER}?parameters=GWETROOT,PRECTOTCORR&community=AG&latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
+    const url = `${POWER}?parameters=GWETROOT,PRECTOTCORR,T2M_MAX,T2M_MIN&community=AG&latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
       + `&start=${today.getUTCFullYear() - LIVE_YEARS}0101&end=${day(today)}&format=JSON`;
     const promise = fetch(url).then((r) => {
       if (!r.ok) throw new DataError('live', { reason: `NASA POWER HTTP ${r.status}` });
@@ -499,28 +499,151 @@ export async function loadPower(lat, lon) {
   const body = await powerCache.get(id);
   const p = body.properties.parameter;
   const fill = body.header?.fill_value ?? -999;
+  const ok = (v) => v != null && v !== fill;
+
+  // Day by day: rain and the water the air "asks for" (reference evaporation, Hargreaves)
+  const days = [];
+  for (const ymd of Object.keys(p.PRECTOTCORR)) {
+    const date = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)));
+    const tmax = p.T2M_MAX[ymd];
+    const tmin = p.T2M_MIN[ymd];
+    days.push({
+      date,
+      wet: ok(p.GWETROOT[ymd]) ? p.GWETROOT[ymd] : null,
+      rain: ok(p.PRECTOTCORR[ymd]) ? p.PRECTOTCORR[ymd] : null,
+      tmax: ok(tmax) ? tmax : null,
+      et0: ok(tmax) && ok(tmin) ? hargreaves(lat, date, tmax, tmin) : null,
+    });
+  }
+
   // Per 10-day period (calendar thirds, the same periods for every season start)
   const periods = new Map();
-  for (const [ymd, wet] of Object.entries(p.GWETROOT)) {
-    const rain = p.PRECTOTCORR[ymd];
-    const date = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)));
-    const third = Math.min(2, Math.floor((date.getUTCDate() - 1) / 10));
-    const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}-${third}`;
-    const s = periods.get(key) || { date: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1 + third * 10)), wet: 0, nWet: 0, rain: 0, nRain: 0, days: 0 };
+  for (const d of days) {
+    const third = Math.min(2, Math.floor((d.date.getUTCDate() - 1) / 10));
+    const key = `${d.date.getUTCFullYear()}-${d.date.getUTCMonth()}-${third}`;
+    const s = periods.get(key) || { date: new Date(Date.UTC(d.date.getUTCFullYear(), d.date.getUTCMonth(), 1 + third * 10)), days: 0, wet: [], rain: [], et0: [], tmax: [] };
     s.days += 1;
-    if (wet !== fill && wet != null) { s.wet += wet; s.nWet += 1; }
-    if (rain !== fill && rain != null) { s.rain += rain; s.nRain += 1; }
+    for (const k of ['wet', 'rain', 'et0', 'tmax']) if (d[k] != null) s[k].push(d[k]);
     periods.set(key, s);
   }
   const list = [...periods.values()].sort((a, b) => a.date - b.date);
-  const soil = list.filter((s) => s.nWet >= 5).map((s) => ({ date: s.date, ndvi: s.wet / s.nWet, ndmi: s.wet / s.nWet }));
-  // 90 days ≈ this period and the 8 before it; only when all 9 are (nearly) complete
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const total = (s, k) => mean(s[k]) * s.days; // period total, gaps filled with the period's mean
+  const full = (s, k) => s[k].length >= Math.min(8, s.days);
+  const row = (date, v) => ({ date, ndvi: v, ndmi: v });
+
+  const soil = list.filter((s) => s.wet.length >= 5).map((s) => row(s.date, mean(s.wet)));
   const rain = [];
+  const balance = [];
+  const heat = [];
   list.forEach((s, i) => {
-    const window = list.slice(Math.max(0, i - 8), i + 1);
-    if (window.length < 9 || window.some((w) => w.nRain < Math.min(8, w.days))) return;
-    const mm = window.reduce((sum, w) => sum + (w.rain / w.nRain) * w.days, 0);
-    rain.push({ date: s.date, ndvi: mm, ndmi: mm });
+    const w90 = list.slice(Math.max(0, i - 8), i + 1);   // ≈ 90 days: this period and the 8 before
+    const w30 = list.slice(Math.max(0, i - 2), i + 1);   // ≈ 30 days
+    if (w90.length === 9 && w90.every((w) => full(w, 'rain'))) {
+      const mm = w90.reduce((sum, w) => sum + total(w, 'rain'), 0);
+      rain.push(row(s.date, mm));
+      if (w90.every((w) => full(w, 'et0'))) balance.push(row(s.date, mm - w90.reduce((sum, w) => sum + total(w, 'et0'), 0)));
+    }
+    // Heat: hotter is worse, but the analysis warns when a value is LOW, so the
+    // mean daily maximum is stored with a minus sign (and shown as °C again).
+    if (w30.length === 3 && w30.every((w) => full(w, 'tmax'))) heat.push(row(s.date, -mean(w30.flatMap((w) => w.tmax))));
   });
-  return { soil, rain, lastDate: list.filter((s) => s.nWet > 0).at(-1)?.date ?? null };
+
+  /** Normal rain for the same calendar days (e.g. the next 16 days) in the given years: mean total in mm. */
+  const rainByDay = new Map(days.filter((d) => d.rain != null).map((d) => [d.date.toISOString().slice(0, 10), d.rain]));
+  const normalRain = (from, nDays, years) => {
+    const totals = years.map((y) => {
+      let sum = 0;
+      for (let k = 0; k < nDays; k++) {
+        const d = new Date(Date.UTC(y, from.getUTCMonth(), from.getUTCDate() + k));
+        const v = rainByDay.get(d.toISOString().slice(0, 10));
+        if (v == null) return null;
+        sum += v;
+      }
+      return sum;
+    }).filter((v) => v != null);
+    return totals.length ? mean(totals) : null;
+  };
+
+  return { soil, rain, balance, heat, normalRain, lastDate: list.filter((s) => s.wet.length).at(-1)?.date ?? null };
+}
+
+/**
+ * Reference evaporation (mm/day) from the daily highest and lowest temperature:
+ * the Hargreaves formula, which FAO recommends when only temperature is known
+ * (FAO Irrigation and Drainage Paper 56, equations 21–25 and 52).
+ */
+export function hargreaves(lat, date, tmax, tmin) {
+  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const J = Math.round((date - start) / 86400000);           // day of the year
+  const phi = (lat * Math.PI) / 180;
+  const dr = 1 + 0.033 * Math.cos((2 * Math.PI * J) / 365);   // Earth–Sun distance
+  const delta = 0.409 * Math.sin((2 * Math.PI * J) / 365 - 1.39); // Sun's declination
+  const ws = Math.acos(Math.max(-1, Math.min(1, -Math.tan(phi) * Math.tan(delta)))); // sunset angle
+  const Ra = ((24 * 60) / Math.PI) * 0.082 * dr * (ws * Math.sin(phi) * Math.sin(delta) + Math.cos(phi) * Math.cos(delta) * Math.sin(ws));
+  const tmean = (tmax + tmin) / 2;
+  return Math.max(0, 0.0023 * 0.408 * Ra * (tmean + 17.8) * Math.sqrt(Math.max(0, tmax - tmin)));
+}
+
+/* ---------- River flow (GloFAS, via Open-Meteo) ---------- */
+
+/**
+ * Daily river discharge from GloFAS, the Copernicus global flood model (5 km
+ * river network, 1984 to today). Low flow is "hydrological drought", the last
+ * stage after the soil. River flows are very uneven (a flood is 100 × a dry
+ * month), so the analysis compares the logarithm of the 10-day mean flow.
+ */
+const FLOOD = 'https://flood-api.open-meteo.com/v1/flood';
+const riverCache = new Map();
+
+export async function loadRiver(lat, lon) {
+  const id = liveId(lat, lon);
+  if (!riverCache.has(id)) {
+    const today = new Date();
+    const url = `${FLOOD}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=river_discharge`
+      + `&start_date=${today.getUTCFullYear() - LIVE_YEARS}-01-01&end_date=${today.toISOString().slice(0, 10)}`;
+    const promise = fetch(url).then(async (r) => {
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new DataError(r.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${r.status}` });
+      return body;
+    });
+    promise.catch(() => riverCache.delete(id));
+    riverCache.set(id, promise);
+  }
+  const body = await riverCache.get(id);
+  const sums = new Map();
+  body.daily.time.forEach((day, i) => {
+    const q = body.daily.river_discharge[i];
+    if (q == null) return;
+    const date = new Date(`${day}T00:00:00Z`);
+    const third = Math.min(2, Math.floor((date.getUTCDate() - 1) / 10));
+    const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}-${third}`;
+    const s = sums.get(key) || { date: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1 + third * 10)), q: 0, n: 0 };
+    s.q += q; s.n += 1;
+    sums.set(key, s);
+  });
+  const rows = [...sums.values()].filter((s) => s.n >= 5)
+    .map((s) => { const v = Math.log10(s.q / s.n + 0.01); return { date: s.date, ndvi: v, ndmi: v, flow: s.q / s.n }; })
+    .sort((a, b) => a.date - b.date);
+  if (rows.length < 36 * 4 || rows.every((r) => r.flow < 0.001)) throw new DataError('liveEmpty');
+  return rows;
+}
+
+/* ---------- The next 16 days (weather forecast, via Open-Meteo) ---------- */
+
+/** Forecast rain and evaporation demand for the next 16 days (one cheap request). */
+export async function loadOutlook(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`
+    + '&daily=precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max&forecast_days=16&timezone=GMT';
+  const r = await fetch(url);
+  if (!r.ok) throw new DataError(r.status === 429 ? 'liveBusy' : 'live');
+  const d = (await r.json()).daily;
+  const sum = (a) => a.reduce((x, y) => x + (y ?? 0), 0);
+  return {
+    from: new Date(`${d.time[0]}T00:00:00Z`),
+    days: d.time.length,
+    rain: sum(d.precipitation_sum),
+    et0: sum(d.et0_fao_evapotranspiration),
+    tmax: Math.max(...d.temperature_2m_max.filter((v) => v != null)),
+  };
 }

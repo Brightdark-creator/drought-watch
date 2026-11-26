@@ -8,7 +8,7 @@
  */
 import * as Data from './data.js';
 import { analyseField, combineLevels, availableSeasons, checkNormalYears, peakPeriod, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
-import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
+import { plantSvg, meterHtml, timelineHtml, gaugeSvg, evidenceGridHtml } from './visuals.js';
 import {
   t, setVariant, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
   formatDate, formatShortDate, formatNumber, formatSigned, formatKm, formatHectares, formatList,
@@ -63,7 +63,10 @@ async function init() {
   renderCard();
 
   try {
-    state.fields = await Data.listFields();
+    // The map shows the CURRENT year. The past droughts (2018–2023) that prove the
+    // method are only loaded when one is opened from the results page (?field=…).
+    const wanted = new URLSearchParams(location.search).get('field');
+    state.fields = (await Data.listFields()).filter((f) => f.id === wanted);
     state.fields.push(...Data.restoreKeptUploads()); // files the user chose to keep
   } catch (error) {
     console.error(error);
@@ -297,8 +300,11 @@ async function renderCard({ loading = false } = {}) {
   // All sources together: the headline is their combined verdict once they are in
   const sources = evidenceReady(field, a);
   if (!sources) evidenceFor(field, a).then(() => { if (currentField() === field) renderCard(); }).catch(() => {});
-  const combined = sources && p != null ? combineLevels(sources.map((src) => sourceAt(src, p).level)) : null;
+  const signs = sources ? sources.filter((src) => src.group === 'sign') : null;
+  const combined = signs && p != null ? combineLevels(signs.map((src) => sourceAt(src, p).level)) : null;
   const level = p == null ? 'unknown' : combined || a.overall[p] || 'unknown';
+  // The gauge needle: the median anomaly of the signs (or of this field's own data until they are in)
+  const gaugeZ = p == null ? null : median((signs || [{ a }]).map((src) => sourceAt(src, p)).filter((x) => x.z != null && ['green', 'yellow', 'red'].includes(x.level)).map((x) => x.z));
   const inSeason = p != null && a.inSeason[p];
 
   // One meter per index: how many standard deviations from normal.
@@ -336,9 +342,9 @@ async function renderCard({ loading = false } = {}) {
   card.className = `card ${level}`;
   card.innerHTML = `
     <div class="card-head">
-      <div class="card-visual">
-        ${plantSvg(level)}
-        <span class="badge" aria-hidden="true">${SYMBOLS[level]}</span>
+      <div class="card-visual card-gauge">
+        ${gaugeSvg(gaugeZ, level)}
+        <span class="gauge-value">${gaugeZ == null ? '' : esc(t('sdValue', { z: formatSigned(gaugeZ) }))}</span>
       </div>
       <div class="card-body">
         <p class="field-name">${meta.join(' · ')}</p>
@@ -352,8 +358,9 @@ async function renderCard({ loading = false } = {}) {
       ${kpi(t('kpiLead'), lead ? esc(t('leadDays', { days: lead.days })) : '–', lead ? t('kpiLeadNote') : t('kpiLeadNone'), lead ? 'highlight' : '')}
       ${confidenceKpi(confidence(a, p))}
     </div>
-    <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
-    ${sourcesPanel(sources, p)}
+    ${sourcesPanel(sources, p, a)}
+    ${outlookPanel(field, a, p, level)}
+    ${calcPanel(sources, p, a, level)}
     <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
 
@@ -373,17 +380,24 @@ function evidenceFor(field, a) {
   if (!evidenceLoading.has(key)) {
     const same = { season: a.season, seasonStartMonth: field.seasonStartMonth || 1, normalYears: a.normalYears, allYear: true };
     const promise = (async () => {
-      const [era, power] = await Promise.allSettled([
+      const [era, power, river] = await Promise.allSettled([
         field.live ? null : Data.loadLivePlace(field.lat, field.lon),
         Data.loadPower(field.lat, field.lon),
+        Data.loadRiver(field.lat, field.lon),
       ]);
+      // Signs: what the plants, the soil and the rivers show. They decide the verdict.
+      // Causes: rain, the water balance and heat. They explain it (and would count twice).
       const list = [];
-      if (!field.live) list.push({ id: 'sat', a });
-      if (field.live) list.push({ id: 'era', a });
-      else if (era.status === 'fulfilled') list.push({ id: 'era', a: analyseField({ ...era.value, ...same }, era.value.rows) });
+      if (!field.live) list.push({ id: 'sat', group: 'sign', a, pair: true });
+      if (field.live) list.push({ id: 'era', group: 'sign', a, pair: true });
+      else if (era.status === 'fulfilled') list.push({ id: 'era', group: 'sign', a: analyseField({ ...era.value, ...same }, era.value.rows), pair: true });
+      if (power.status === 'fulfilled') list.push({ id: 'merra', group: 'sign', a: analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil) });
+      if (river.status === 'fulfilled') list.push({ id: 'river', group: 'sign', a: analyseField({ id: 'river', ...same, sdFloor: 0.05 }, river.value), unit: 'flow' });
       if (power.status === 'fulfilled') {
-        list.push({ id: 'merra', a: analyseField({ id: 'merra', ...same, sdFloor: 0.01 }, power.value.soil) });
-        list.push({ id: 'rain', a: analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.value.rain), rain: true });
+        list.push({ id: 'rain', group: 'cause', a: analyseField({ id: 'rain', ...same, sdFloor: 5 }, power.value.rain), unit: 'mm' });
+        list.push({ id: 'balance', group: 'cause', a: analyseField({ id: 'balance', ...same, sdFloor: 5 }, power.value.balance), unit: 'mm' });
+        list.push({ id: 'heat', group: 'cause', a: analyseField({ id: 'heat', ...same, sdFloor: 0.5 }, power.value.heat), unit: 'heat' });
+        list.power = power.value;
       }
       evidence.set(key, list);
       return list;
@@ -406,32 +420,140 @@ function sourceAt(src, p) {
   return { level: null };
 }
 
+function median(values) {
+  if (!values.length) return null;
+  const v = [...values].sort((x, y) => x - y);
+  return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+}
+
+/** The measured value in everyday units ("106 mm, normal 295 mm"). */
+function valueText(src, at) {
+  if (at.value == null || at.normal == null) return '';
+  if (src.unit === 'mm') return t('srcMm', { mm: Math.round(at.value), normal: Math.round(at.normal) });
+  if (src.unit === 'heat') return t('srcHeat', { c: formatNumber(-at.value, 1), normal: formatNumber(-at.normal, 1) });
+  if (src.unit === 'flow') {
+    const q = (v) => formatNumber(10 ** v - 0.01, 10 ** v < 1 ? 2 : 1);
+    return t('srcFlow', { q: q(at.value), normal: q(at.normal) });
+  }
+  if (src.pair) {
+    const z = (k) => (src.a[k].z[at.q] == null ? '–' : formatSigned(src.a[k].z[at.q]));
+    return t(`srcPair_${src.id}`, { a: z('ndmi'), b: z('ndvi') });
+  }
+  return '';
+}
+
+/** Where z sits on a bar from −4 to +2 SD, in percent. */
+const zPos = (z) => ((Math.min(2, Math.max(-4, z)) + 4) / 6) * 100;
+
+function sourceRow(src, p) {
+  const at = sourceAt(src, p);
+  const judged = ['green', 'yellow', 'red'].includes(at.level);
+  const symbol = judged ? at.level : 'off';
+  const heat = src.unit === 'heat' ? '_heat' : '';
+  const word = !at.level ? t('srcNone') : judged ? t(`idx_${at.level}${heat}`) : t('idx_off');
+  const detail = [valueText(src, at), at.q != null && at.q !== p ? t('srcPrev') : ''].filter(Boolean).join(' · ');
+  const bar = at.z == null ? '' : `<span class="zbar" aria-hidden="true"><i class="zbar-mark lvl-${symbol}" style="left:${zPos(at.z).toFixed(1)}%"></i></span>`;
+  return `<li>
+    <span class="mini lvl-${symbol}" aria-hidden="true">${SYMBOLS[symbol]}</span>
+    <span class="src-name">${esc(t(`src_${src.id}`))}</span>
+    <span class="src-z">${at.z == null || !judged ? '' : esc(t('sdValue', { z: formatSigned(heat ? -at.z : at.z) }))}</span>
+    ${bar}
+    <span class="src-detail"><b>${esc(word)}</b>${detail ? ` · ${esc(detail)}` : ''}</span>
+  </li>`;
+}
+
 function sourcesPanel(sources, p) {
   if (p == null) return '';
-  if (!sources) return `<div class="sources-panel"><p class="hint">${esc(t('srcLoading'))}</p></div>`;
-  const rows = sources.map((src) => {
-    const at = sourceAt(src, p);
-    const judged = ['green', 'yellow', 'red'].includes(at.level);
-    const symbol = judged ? at.level : 'off';
-    const word = !at.level ? t('srcNone') : judged ? t(`idx_${at.level}`) : t('idx_off');
-    const detail = [
-      at.z != null && judged ? t('sdValue', { z: formatSigned(at.z) }) : '',
-      src.rain && at.value != null ? t('srcRainMm', { mm: Math.round(at.value), normal: Math.round(at.normal ?? 0) }) : '',
-      at.q != null && at.q !== p ? t('srcPrev') : '',
-    ].filter(Boolean).join(' · ');
-    return `<li><span class="mini lvl-${symbol}" aria-hidden="true">${SYMBOLS[symbol]}</span>
-      <span class="src-name">${esc(t(`src_${src.id}`))}</span>
-      <span class="src-detail"><b>${esc(word)}</b>${detail ? ` · ${esc(detail)}` : ''}</span></li>`;
-  }).join('');
-  const levels = sources.map((src) => sourceAt(src, p).level).filter((l) => ['green', 'yellow', 'red'].includes(l));
-  const dry = levels.filter((l) => l !== 'green').length;
+  if (!sources) return `<div class="sources-panel"><p class="hint loading-line">${esc(t('srcLoading'))}</p></div>`;
+  const group = (g) => sources.filter((src) => src.group === g);
+  const judged = group('sign').map((src) => sourceAt(src, p).level).filter((l) => ['green', 'yellow', 'red'].includes(l));
+  const dry = judged.filter((l) => l !== 'green').length;
+  const scale = `<div class="zscale" aria-hidden="true"><span style="left:${zPos(-2)}%">−2</span><span style="left:${zPos(-1)}%">−1</span><span style="left:${zPos(0)}%">${esc(t('idx_green'))}</span></div>`;
   return `<div class="sources-panel">
-    <h3 class="sources-title">${esc(t('srcTitle'))}</h3>
-    <ul class="src-list">${rows}</ul>
-    <p class="hint">${esc(levels.length ? t('srcVerdict', { n: dry, total: levels.length }) : t('srcNoneAll'))}
-      <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">NASA POWER</a> ·
-      <a href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5-Land</a></p>
+    <div class="src-group">
+      <h3 class="sources-title">${esc(t('groupSigns'))}</h3>
+      <p class="hint">${esc(judged.length ? t('srcVerdict', { n: dry, total: judged.length }) : t('srcNoneAll'))}</p>
+      <ul class="src-list">${group('sign').map((src) => sourceRow(src, p)).join('')}</ul>${scale}
+    </div>
+    ${group('cause').length ? `<div class="src-group">
+      <h3 class="sources-title">${esc(t('groupCauses'))}</h3>
+      <p class="hint">${esc(t('groupCausesHint'))}</p>
+      <ul class="src-list">${group('cause').map((src) => sourceRow(src, p)).join('')}</ul>${scale}
+    </div>` : ''}
+    <p class="hint src-links">${esc(t('sourcesLabel'))}:
+      <a href="https://power.larc.nasa.gov/" target="_blank" rel="noopener">NASA POWER (MERRA-2)</a> ·
+      <a href="https://open-meteo.com/en/docs/historical-weather-api" target="_blank" rel="noopener">ERA5-Land</a> ·
+      <a href="https://open-meteo.com/en/docs/flood-api" target="_blank" rel="noopener">GloFAS</a> ·
+      <a href="https://www.fao.org/4/x0490e/x0490e00.htm" target="_blank" rel="noopener">FAO-56 (Hargreaves)</a></p>
   </div>`;
+}
+
+/* ---------- What to expect: the next 16 days ---------- */
+const outlooks = new Map();
+
+function outlookPanel(field, a, p, level) {
+  // Only for "now": the newest period of a season that is still running
+  const newest = a.dataPeriods.at(-1);
+  const date = p == null ? null : a.labels[p];
+  if (p == null || p !== newest || !date || Date.now() - date.getTime() > 40 * 86400000) return '';
+  const key = Data.liveId(field.lat, field.lon);
+  if (!outlooks.has(key)) {
+    outlooks.set(key, null);
+    Data.loadOutlook(field.lat, field.lon)
+      .then((o) => { outlooks.set(key, o); if (currentField() === field) renderCard(); })
+      .catch(() => outlooks.delete(key));
+  }
+  const o = outlooks.get(key);
+  const power = evidenceReady(field, a)?.power;
+  if (!o || !power) return `<div class="outlook"><h3 class="sources-title">${esc(t('outlookTitle'))}</h3><p class="hint loading-line">${esc(t('outlookLoading'))}</p></div>`;
+  const normal = power.normalRain(o.from, o.days, a.normalYears);
+  let verdict = 'outlookSame';
+  if (normal == null || normal < 5) verdict = 'outlookDry';
+  else if (o.rain < 0.5 * normal) verdict = level === 'green' ? 'outlookWatch' : 'outlookWorse';
+  else if (o.rain > 1.5 * normal) verdict = level === 'green' ? 'outlookSame' : 'outlookEase';
+  const share = normal ? Math.round((100 * o.rain) / normal) : null;
+  return `<div class="outlook outlook-${verdict}">
+    <h3 class="sources-title">${esc(t('outlookTitle'))}</h3>
+    <div class="outlook-figures">
+      <p><b>${esc(formatNumber(o.rain, 0))} mm</b><span>${esc(t('outlookRain', { days: o.days }))}</span></p>
+      <p><b>${normal == null ? '–' : `${esc(formatNumber(normal, 0))} mm`}</b><span>${esc(t('outlookNormal'))}</span></p>
+      <p><b>${esc(formatNumber(o.et0, 0))} mm</b><span>${esc(t('outlookEt0'))}</span></p>
+    </div>
+    <p class="outlook-verdict">${esc(t(verdict, { share: share ?? '–' }))}</p>
+  </div>`;
+}
+
+/* ---------- How this was calculated (with the real numbers) ---------- */
+function calcPanel(sources, p, a, level) {
+  if (p == null) return '';
+  const from = a.labels[p];
+  const to = new Date(from.getTime() + 9 * 86400000);
+  const day = (d) => formatDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
+  const signs = (sources || [{ id: a.field?.live ? 'era' : 'sat', group: 'sign', a, pair: true }]).filter((src) => src.group === 'sign');
+  const lines = signs.map((src) => {
+    const at = sourceAt(src, p);
+    if (at.z == null) return `<li><b>${esc(t(`src_${src.id}`))}</b>: ${esc(t('srcNone'))}</li>`;
+    const k = src.pair && src.a.ndmi.z[at.q] != null && src.a.ndmi.z[at.q] < (src.a.ndvi.z[at.q] ?? Infinity) ? 'ndmi' : 'ndvi';
+    const fmt = (v) => formatNumber(v, 3);
+    // River flow is compared as a logarithm (floods are 100 × a dry month); the text says so
+    const flow = src.unit === 'flow' ? ` ${t('calcLog', { q: formatNumber(10 ** src.a[k].values[at.q] - 0.01, 2) })}` : '';
+    return `<li><b>${esc(t(`src_${src.id}`))}</b>: ${esc(t('calcLine', {
+      value: fmt(src.a[k].values[at.q]), mean: fmt(src.a[k].mean[at.q]), sd: fmt(src.a[k].sd[at.q]),
+      z: formatSigned(src.a[k].z[at.q]), n: src.a[k].n[at.q], word: t(`idx_${at.level}`),
+    }))}${esc(flow)}</li>`;
+  }).join('');
+  const judged = signs.map((src) => sourceAt(src, p).level).filter((l) => ['green', 'yellow', 'red'].includes(l));
+  const count = (l) => judged.filter((x) => x === l).length;
+  return `<details class="calc">
+    <summary>${esc(t('calcTitle'))}</summary>
+    <ol class="calc-steps">
+      <li>${esc(t('calcStep1', { from: day(from), to: day(to), years: formatList(a.normalYears) }))}</li>
+      <li>${esc(t('calcStep2'))}<ul class="calc-lines">${lines}</ul></li>
+      <li>${esc(t('calcStep3'))}</li>
+      <li>${esc(t('calcStep4', { red: count('red'), yellow: count('yellow'), green: count('green'), total: judged.length, level: t(`level_${level}`) }))}</li>
+      <li>${esc(t('calcStep5'))}</li>
+    </ol>
+  </details>`;
 }
 
 /** Links to the reports that describe what really happened (from fields.json). */
@@ -515,9 +637,29 @@ function renderSpace() {
 }
 
 /** The season at a glance: one bar per 10-day period (click a bar to jump there). */
+/**
+ * The season at a glance: one row per source, one cell per 10-day period.
+ * The top row is the combined verdict of the signs. Until the other sources
+ * are in, it shows this field's own data as before.
+ */
 function renderTimeline(a) {
   const narrow = window.matchMedia('(max-width: 560px)').matches;
-  $('timeline').innerHTML = timelineHtml(a, state.period, (d) => formatDate(d, { month: narrow ? 'narrow' : 'short' }));
+  const monthLabel = (d) => formatDate(d, { month: narrow ? 'narrow' : 'short' });
+  const field = currentField();
+  const sources = field ? evidenceReady(field, a) : null;
+  if (!sources) {
+    $('timeline').innerHTML = timelineHtml(a, state.period, monthLabel);
+    if (field) evidenceFor(field, a).then(() => { if (currentField() === field) renderTimeline(a); }).catch(() => {});
+    return;
+  }
+  const signs = sources.filter((src) => src.group === 'sign');
+  const combinedRow = a.labels.map((_, q) => combineLevels(signs.map((src) => src.a.overall[q]))
+    ?? (signs.some((src) => src.a.overall[q] === 'off') ? 'off' : null));
+  const rows = [
+    { label: esc(t('gridCombined')), levels: combinedRow },
+    ...sources.map((src) => ({ label: `${esc(t(`srcShort_${src.id}`))}${src.group === 'cause' ? ' <small>*</small>' : ''}`, levels: src.a.overall })),
+  ];
+  $('timeline').innerHTML = evidenceGridHtml(rows, state.period, a.labels, monthLabel);
 }
 
 /** The same numbers as the charts, as a table (for screen readers and for checking). */
@@ -887,7 +1029,7 @@ function wireControls() {
   });
   // Click a bar of the season timeline to jump to that date.
   $('timeline').addEventListener('click', async (e) => {
-    const bar = e.target.closest('.bar');
+    const bar = e.target.closest('.bar, .cell');
     const field = currentField();
     if (!bar || !field) return;
     const a = await analysisFor(field);

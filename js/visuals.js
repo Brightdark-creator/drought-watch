@@ -120,3 +120,59 @@ export function timelineHtml(a, selected, monthLabel) {
     .join('');
   return `<div class="bars">${cells}</div><div class="months" aria-hidden="true">${months}</div>`;
 }
+
+/* ---------- 4. Status gauge (replaces the plant on the card) ---------- */
+
+/**
+ * A half-circle dial from −4 SD (left) to +2 SD (right), cut into the same
+ * red / yellow / green zones as the warning rule. The needle points at `z`
+ * (the median of the sources that show signs of drought). The symbol in the
+ * middle repeats the level for people who cannot tell the colours apart.
+ */
+export function gaugeSvg(z, level) {
+  const cx = 60; const cy = 62; const r = 48;
+  const angle = (v) => Math.PI * (1 - (Math.min(METER_MAX, Math.max(METER_MIN, v)) - METER_MIN) / (METER_MAX - METER_MIN));
+  const point = (v, radius) => [cx + radius * Math.cos(angle(v)), cy - radius * Math.sin(angle(v))];
+  const arc = (from, to, color) => {
+    const [x1, y1] = point(from, r);
+    const [x2, y2] = point(to, r);
+    return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="${color}" stroke-width="12" fill="none"/>`;
+  };
+  const colors = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828' };
+  const active = (l) => (level === l ? colors[l] : `${colors[l]}55`);
+  const needle = z == null ? '' : (() => {
+    const [x, y] = point(z, r - 14);
+    return `<line class="gauge-needle" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#12251c" stroke-width="3.5" stroke-linecap="round" style="--a:${(90 - (angle(z) * 180) / Math.PI).toFixed(1)}deg"/>`;
+  })();
+  const symbol = SYMBOLS[level] || SYMBOLS.unknown;
+  return `<svg class="gauge" viewBox="0 0 120 92" aria-hidden="true" focusable="false">
+    ${arc(METER_MIN, RED_Z, active('red'))}${arc(RED_Z, YELLOW_Z, active('yellow'))}${arc(YELLOW_Z, METER_MAX, active('green'))}
+    ${needle}
+    <circle cx="${cx}" cy="${cy}" r="7" fill="#12251c"/>
+    <text x="${cx}" y="88" text-anchor="middle" class="gauge-symbol gauge-${level}">${symbol}</text>
+  </svg>`;
+}
+
+/* ---------- 5. Every source over the season ---------- */
+
+/**
+ * One row per source, one cell per 10-day period, coloured by its level; the
+ * first row is the combined verdict. Symbols in yellow/red cells keep it
+ * readable without colour. Click a cell to jump to that date.
+ */
+export function evidenceGridHtml(rows, selected, labels, monthLabel) {
+  const cells = (levels) => levels.map((level, p) => {
+    const l = level === 'green' || level === 'yellow' || level === 'red' ? level : level === 'off' ? 'off' : 'none';
+    const cls = ['cell', `cell-${l}`];
+    if (selected != null && p > selected) cls.push('future');
+    if (p === selected) cls.push('current');
+    return `<span class="${cls.join(' ')}" data-p="${p}">${l === 'yellow' || l === 'red' ? SYMBOLS[l] : ''}</span>`;
+  }).join('');
+  const months = labels
+    .map((d, p) => (p % 3 === 0 ? `<span style="grid-column:${p + 2} / span 3">${monthLabel(d)}</span>` : ''))
+    .join('');
+  return `<div class="grid-rows">${rows.map((r, i) => `
+    <div class="grid-row${i === 0 ? ' grid-combined' : ''}"><span class="grid-label">${r.label}</span>${cells(r.levels)}</div>`).join('')}
+    <div class="grid-row grid-months" aria-hidden="true"><span class="grid-label"></span>${months}</div>
+  </div>`;
+}
