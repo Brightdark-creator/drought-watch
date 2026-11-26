@@ -53,6 +53,7 @@ function esc(text) {
 async function init() {
   setLanguage(readPref('dw.lang', null) || initialLanguage());
   buildLanguageMenu();
+  buildThemeMenu();
   applyStaticTexts();
   setupQr($('phone-qr'), $('qr'), () => t('qrAlt'));
 
@@ -281,10 +282,12 @@ async function renderCard({ loading = false } = {}) {
   const card = $('card');
   const field = currentField();
   if (!field || loading) {
+    document.body.dataset.state = loading ? 'loading' : 'empty';
+    for (const id of ['overview-extra', 'sources-box', 'calc-box']) $(id).innerHTML = '';
     card.className = `card${loading ? ' loading' : ''}`;
     card.innerHTML = `
       <div class="card-head">
-        <div class="card-visual">${plantSvg(loading ? 'off' : 'green')}</div>
+        <div class="card-visual card-gauge">${gaugeSvg(null, loading ? 'unknown' : 'off')}</div>
         <div class="card-body">
           <h2 class="level">${esc(loading ? t('loading') : t('chooseTitle'))}</h2>
           ${loading ? '' : `<p class="advice">${esc(t('chooseText'))}</p>`}
@@ -360,11 +363,13 @@ async function renderCard({ loading = false } = {}) {
       ${kpi(t('kpiLead'), lead ? esc(t('leadDays', { days: lead.days })) : '–', lead ? t('kpiLeadNote') : t('kpiLeadNone'), lead ? 'highlight' : '')}
       ${confidenceKpi(confidence(a, p))}
     </div>
-    ${sourcesPanel(sources, p, a)}
-    ${outlookPanel(field, a, p, level)}
-    ${officialPanel(field, a, p, level)}
-    ${calcPanel(sources, p, a, level)}
+    `;
+  // The rest goes into the tabs: Overview (outlook, official check, notes), Sources, How
+  document.body.dataset.state = 'place';
+  $('overview-extra').innerHTML = `${outlookPanel(field, a, p, level)}${officialPanel(field, a, p, level)}
     <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t(field.model === 'merra' ? 'liveSourceNasa' : 'liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+  $('sources-box').innerHTML = sourcesPanel(sources, p, a);
+  $('calc-box').innerHTML = calcPanel(sources, p, a, level).replace('<details class="calc">', '<details class="calc" open>');
 }
 
 /* ---------- All sources together ----------
@@ -1067,6 +1072,57 @@ function hideMessage() {
 }
 
 /* ---------- Controls ---------- */
+/* ---------- Colour themes: dark (default), earth, light ---------- */
+const THEMES = ['dark', 'earth', 'light'];
+
+function buildThemeMenu() {
+  const current = document.documentElement.dataset.theme || 'dark';
+  $('theme').innerHTML = THEMES
+    .map((th) => `<option value="${th}"${th === current ? ' selected' : ''}>${esc(t(`theme_${th}`))}</option>`)
+    .join('');
+}
+
+function setTheme(name) {
+  const root = document.documentElement;
+  root.classList.add('no-trans');
+  root.dataset.theme = name;
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('no-trans')));
+  writePref('dw.theme', name);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(document.body).backgroundColor);
+  rerender(); // charts and the gauge read their colours from the theme
+}
+
+/* ---------- Side panel: tabs and the collapse button ---------- */
+function showTab(name, { focus = false } = {}) {
+  document.querySelectorAll('.tabs [role="tab"]').forEach((tab) => {
+    const on = tab.dataset.tab === name;
+    tab.setAttribute('aria-selected', String(on));
+    tab.tabIndex = on ? 0 : -1;
+    if (on && focus) tab.focus();
+    $(`pane-${tab.dataset.tab}`).hidden = !on;
+  });
+  if (name === 'charts') rerender(); // charts need their real width, which they only have when visible
+}
+
+function wirePanel() {
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => showTab(tab.dataset.tab));
+    // Arrow keys move between tabs (the usual keyboard pattern for tabs)
+    tab.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      showTab(tabs[(i + step + tabs.length) % tabs.length].dataset.tab, { focus: true });
+    });
+  });
+  $('panel-toggle').addEventListener('click', () => {
+    const open = document.body.classList.toggle('panel-closed') === false;
+    $('panel-toggle').setAttribute('aria-expanded', String(open));
+  });
+  $('theme').addEventListener('change', (e) => setTheme(e.target.value));
+}
+
 function buildLanguageMenu() {
   $('lang').innerHTML = LANGUAGES
     .map((l) => `<option value="${l}"${l === getLanguage() ? ' selected' : ''}>${esc(STRINGS[l].languageName)}</option>`)
@@ -1074,11 +1130,13 @@ function buildLanguageMenu() {
 }
 
 function wireControls() {
+  wirePanel();
   $('search').addEventListener('submit', onSearch);
   $('light-toggle').addEventListener('click', () => setLightMode(!state.light));
   $('lang').addEventListener('change', (e) => {
     setLanguage(e.target.value);
     writePref('dw.lang', getLanguage());
+    buildThemeMenu();
     applyStaticTexts();
     MapView.setLayerLabels(layerLabels());
     renderChips();

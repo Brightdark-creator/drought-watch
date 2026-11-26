@@ -10,15 +10,14 @@
  * A dotted vertical line marks the date chosen with the slider.
  */
 
-const COLORS = {
-  season: '#12251c',
-  band: 'rgba(47, 125, 80, 0.16)',   // the normal range: soft green, "where this field usually is"
-  mean: '#2f7d50',
-  compare: '#2563eb',
-  grid: 'rgba(18, 37, 28, 0.06)',
-  selected: '#12251c',
-  offSeason: 'rgba(28, 35, 33, 0.045)',
+// Colours come from the page theme (dark / earth / light): CSS variables --chart-*,
+// read each time a chart is drawn, so switching the theme re-colours the charts.
+const DEFAULT_COLORS = {
+  season: '#12251c', band: 'rgba(47, 125, 80, 0.16)', mean: '#2f7d50', compare: '#2563eb',
+  grid: 'rgba(18, 37, 28, 0.06)', selected: '#12251c', offSeason: 'rgba(28, 35, 33, 0.045)', text: '#4c5b53',
 };
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const COLORS = new Proxy(DEFAULT_COLORS, { get: (d, k) => cssVar(`--chart-${k === 'offSeason' ? 'off' : k}`) || d[k] });
 
 export const LEVEL_COLORS = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828', off: '#a3aca8', unknown: '#a3aca8' };
 const POINT_BORDER = { ...LEVEL_COLORS, yellow: '#7a5b00' };
@@ -189,7 +188,7 @@ export class IndexChart {
     if (!this.chart) {
       // Same font as the page (Archivo), a readable size and the page's muted ink
       Object.assign(window.Chart.defaults.font, { family: getComputedStyle(document.body).fontFamily, size: 12 });
-      window.Chart.defaults.color = '#4c5b53';
+      window.Chart.defaults.color = COLORS.text;
       this.chart = new window.Chart(this.canvas, { type: 'line', data: { labels: d.labels, datasets }, options, plugins: [selectedLine] });
     } else {
       this.chart.data.labels = d.labels;

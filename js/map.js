@@ -30,7 +30,7 @@ function readBase() {
 }
 
 /** Add Leaflet's CSS and JS to the page once. */
-function loadLeaflet() {
+export function loadLeaflet() {
   if (window.L) return Promise.resolve();
   if (!leafletLoading) {
     leafletLoading = new Promise((resolve, reject) => {
@@ -60,7 +60,7 @@ export async function initMap(container, newHandlers, labels) {
   if (map) return;
   map = L.map(container, { worldCopyJump: true }).setView([35, 0], 2);
   // The warning card overlaps the bottom of the map, so the map credits go to the top (they must stay visible).
-  map.attributionControl.setPosition('topright');
+  map.attributionControl.setPosition('bottomleft');
   layers = {
     // Sentinel-2 cloudless: a cloud-free picture of the whole Earth made from
     // the same Sentinel-2 satellites the app uses (by EOX, free for non-commercial use).
@@ -77,7 +77,7 @@ export async function initMap(container, newHandlers, labels) {
   // Overlays from NASA GIBS (newest picture, tiles need no account): what the
   // satellites see right now, over the whole map. Switched on in the layer box.
   const gdo = (layer, crs) => L.tileLayer.wms('https://drought.emergency.copernicus.eu/api/wms', {
-    layers: layer, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.75, ...(crs ? { crs } : {}),
+    layers: layer, format: 'image/png', transparent: true, version: '1.3.0', uppercase: true, opacity: 0.85, className: 'gdo-layer', ...(crs ? { crs } : {}),
     attribution: '<a href="https://drought.emergency.copernicus.eu/">Copernicus Drought Observatory</a>',
   });
   const gibs = (layer, matrix, maxNativeZoom, credit) => L.tileLayer(
@@ -118,7 +118,7 @@ export function setLayerLabels(labels) {
       [labels.overlays.cdi]: overlays.cdi, [labels.overlays.gdoSoil]: overlays.gdoSoil, [labels.overlays.gdoVeg]: overlays.gdoVeg,
     }
     : null;
-  layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, extra, { collapsed: true, position: 'topright' }).addTo(map);
+  layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, extra, { collapsed: true, position: 'topleft' }).addTo(map);
 }
 
 export function isMapReady() {
@@ -196,12 +196,22 @@ export function focusField(field) {
   selectedId = field.id;
   if (previous && pins.has(previous)) setFieldLevel(previous, pins.get(previous).level);
   setFieldLevel(field.id, pins.get(field.id)?.level ?? null);
-  const outline = pins.get(field.id)?.outline;
-  if (!canAnimate()) {
-    if (outline) map.fitBounds(outline.getBounds(), { padding: [60, 60], maxZoom: 15, animate: false });
-    else map.setView([field.lat, field.lon], 14, { animate: false });
-  } else if (outline) map.flyToBounds(outline.getBounds(), { padding: [60, 60], maxZoom: 15, duration: 1 });
-  else map.flyTo([field.lat, field.lon], 14, { duration: 1 });
+  // Fit the place into the part of the map the side panel does not cover
+  const bounds = pins.get(field.id)?.outline?.getBounds() ?? L.latLng(field.lat, field.lon).toBounds(2500);
+  const fit = { ...panelPadding(), maxZoom: 15 };
+  if (!canAnimate()) map.fitBounds(bounds, { ...fit, animate: false });
+  else map.flyToBounds(bounds, { ...fit, duration: 1 });
+}
+
+/** Padding so a place is centred in the visible part of the map (beside or above the panel). */
+function panelPadding() {
+  const panel = document.getElementById('panel');
+  const top = 96; // the floating top bar
+  if (!panel || document.body.classList.contains('panel-closed')) return { paddingTopLeft: [40, top], paddingBottomRight: [40, 40] };
+  const r = panel.getBoundingClientRect();
+  return window.innerWidth >= 900
+    ? { paddingTopLeft: [40, top], paddingBottomRight: [Math.max(40, window.innerWidth - r.left + 32), 40] }
+    : { paddingTopLeft: [24, top], paddingBottomRight: [24, Math.max(40, window.innerHeight - r.top + 24)] };
 }
 
 export function flyTo(lat, lon, zoom = 11) {

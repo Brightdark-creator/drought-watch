@@ -7,10 +7,12 @@
  * (No hover tooltips: the "Show the numbers" table has every value.)
  */
 
-const C = {
+// Colours from the page theme (CSS variables --chart-*), with light-theme defaults
+const C_DEFAULT = {
   season: '#12251c', band: 'rgba(47,125,80,0.16)', mean: '#2f7d50', compare: '#2563eb',
   grid: 'rgba(0,0,0,0.07)', text: '#59645f', selected: '#12251c', off: 'rgba(28,35,33,0.045)',
 };
+const C = new Proxy(C_DEFAULT, { get: (d, k) => getComputedStyle(document.documentElement).getPropertyValue(`--chart-${k}`).trim() || d[k] });
 const LEVEL = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828', off: '#a3aca8', unknown: '#a3aca8' };
 
 /**

@@ -142,13 +142,13 @@ export function gaugeSvg(z, level) {
   const active = (l) => (level === l ? colors[l] : `${colors[l]}55`);
   const needle = z == null ? '' : (() => {
     const [x, y] = point(z, r - 14);
-    return `<line class="gauge-needle" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#12251c" stroke-width="3.5" stroke-linecap="round" style="--a:${(90 - (angle(z) * 180) / Math.PI).toFixed(1)}deg"/>`;
+    return `<line class="gauge-needle" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" style="--a:${(90 - (angle(z) * 180) / Math.PI).toFixed(1)}deg"/>`;
   })();
   const symbol = SYMBOLS[level] || SYMBOLS.unknown;
   return `<svg class="gauge" viewBox="0 0 120 92" aria-hidden="true" focusable="false">
     ${arc(METER_MIN, RED_Z, active('red'))}${arc(RED_Z, YELLOW_Z, active('yellow'))}${arc(YELLOW_Z, METER_MAX, active('green'))}
     ${needle}
-    <circle cx="${cx}" cy="${cy}" r="7" fill="#12251c"/>
+    <circle cx="${cx}" cy="${cy}" r="7" fill="currentColor"/>
     <text x="${cx}" y="88" text-anchor="middle" class="gauge-symbol gauge-${level}">${symbol}</text>
   </svg>`;
 }

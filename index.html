@@ -1,111 +1,116 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Drought Watch</title>
-  <meta name="description" content="Drought status for any place on Earth: daily soil water compared with the same place's last 15 years, plus satellite case studies of six real droughts.">
-  <meta name="theme-color" content="#0d1e16">
+  <meta name="description" content="Is it too dry where you are? Drought status for any place on Earth from seven sources, checked against the official Copernicus drought maps.">
+  <meta name="theme-color" content="#0f1613">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <!-- Old shared links (index.html?field=… or ?lat=…&lon=…) still open the map page -->
-  <script>if (/[?&](field|lat|q)=/.test(location.search)) location.replace('check.html' + location.search);</script>
+  <script>if (/[?&](field|lat|q|area)=/.test(location.search)) location.replace('check.html' + location.search);</script>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('dw.theme') || 'dark'; } catch {}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/home.js"></script>
 </head>
-<body class="home-page">
+<body class="home">
   <a class="skip-link" href="#main" data-i18n="skipToContent">Skip to content</a>
 
-  <!-- Home page: what the project does, a search that opens the map, the case studies and the results -->
-  <header class="home-hero">
-    <div class="home-wrap">
-      <nav class="home-nav" data-i18n-aria-label="homeNav">
-        <a class="brand" href="./">
-          <img class="logo" src="icons/icon.svg" alt="" width="36" height="36">
-          <span data-i18n="appTitle">Drought Watch</span>
-        </a>
-        <div class="home-links">
-          <a href="check.html" data-i18n="navMap">Map</a>
-          <a href="#cases" data-i18n="navCases">Regions</a>
-          <a href="summary.html" data-i18n="navResults">Results</a>
-          <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
-          <select id="lang"></select>
-        </div>
-      </nav>
-
-      <div class="home-hero-grid">
-        <div class="home-hero-text">
-          <h1 data-i18n="homeTitle">Drought status for any place on Earth</h1>
-          <p class="home-lead" data-i18n="homeLead"></p>
-          <form class="search home-search" action="check.html" method="get" role="search">
-            <label class="visually-hidden" for="home-q" data-i18n="searchLabel"></label>
-            <input id="home-q" name="q" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder" required>
-            <button type="submit" data-i18n="homeCheck">Check this place</button>
-          </form>
-          <p class="home-alt">
-            <a href="check.html?locate=1" data-i18n="homeLocate">Use my location</a>
-            <span aria-hidden="true">or</span>
-            <a href="check.html" data-i18n="homeOpenMap">tap anywhere on the map</a>
-          </p>
-        </div>
-
-        <!-- The newest NASA MODIS greenness picture of the whole Earth (16-day composite, always the latest) -->
-        <figure class="home-world">
-          <img src="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&amp;REQUEST=GetMap&amp;VERSION=1.3.0&amp;LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_NDVI_16Day&amp;STYLES=&amp;CRS=EPSG:4326&amp;BBOX=-60,-180,85,180&amp;WIDTH=1200&amp;HEIGHT=483&amp;FORMAT=image/jpeg&amp;TIME=default"
-            width="1200" height="483" alt="" data-i18n-alt="homeWorldAlt">
-          <span class="home-tag" data-i18n="homeWorldTag">Greenness now, NASA MODIS</span>
-        </figure>
-      </div>
+  <header class="home-nav">
+    <a class="brand" href="./">
+      <img class="logo" src="icons/icon.svg" alt="" width="32" height="32">
+      <span class="brand-name" data-i18n="appTitle">Drought Watch</span>
+    </a>
+    <nav class="home-links" data-i18n-aria-label="homeNav">
+      <a href="check.html" data-i18n="navMap">Map</a>
+      <a href="#how" data-i18n="navHow">How it works</a>
+      <a href="summary.html" data-i18n="navResults">Results</a>
+    </nav>
+    <div class="settings">
+      <label class="visually-hidden" for="theme" data-i18n="themeLabel">Colours</label>
+      <select id="theme" class="pill-select"></select>
+      <label class="visually-hidden" for="lang" data-i18n="language">Language</label>
+      <select id="lang" class="pill-select"></select>
     </div>
   </header>
 
   <main id="main">
+  <!-- Hero: the official map of where the soil is drier than normal right now, with the search on top -->
+  <section class="home-hero">
+    <div id="home-map" class="home-map" role="region" data-i18n-aria-label="homeMapLabel"></div>
+    <div class="home-hero-card">
+      <p class="eyebrow-live"><span class="live-dot" aria-hidden="true"></span><span data-i18n="homeLive">Live, updated every day</span></p>
+      <h1 data-i18n="homeTitle">Is it too dry where you are?</h1>
+      <p class="home-lead" data-i18n="homeLead"></p>
+      <form class="search home-search" action="check.html" method="get" role="search">
+        <label class="visually-hidden" for="home-q" data-i18n="searchLabel"></label>
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="home-q" name="q" type="search" autocomplete="off" enterkeyhint="search" data-i18n-placeholder="searchPlaceholder" required>
+        <button type="submit" class="search-go" data-i18n="homeCheck">Check</button>
+      </form>
+      <p class="home-alt">
+        <a href="check.html?locate=1" data-i18n="homeLocate">Use my location</a>
+        <span class="dot" aria-hidden="true">·</span>
+        <span data-i18n="homeClickMap">or click anywhere on the map</span>
+      </p>
+      <div class="map-key" aria-hidden="true">
+        <span class="map-key-bar"></span>
+        <span class="map-key-labels"><span data-i18n="keyDrier">drier than normal</span><span data-i18n="keyWetter">wetter</span></span>
+      </div>
+      <p class="map-key-note" data-i18n="homeMapNote"></p>
+    </div>
+  </section>
+
     <!-- How it works: a real sequence, so the steps are numbered -->
-    <section class="home-section">
+    <section class="home-section" id="how">
       <div class="home-wrap">
         <h2 data-i18n="homeHowTitle">How the warning works</h2>
         <ol class="home-steps">
-          <li><b data-i18n="homeHow1Title"></b><span data-i18n="homeHow1"></span></li>
-          <li><b data-i18n="homeHow2Title"></b><span data-i18n="homeHow2"></span></li>
-          <li><b data-i18n="homeHow3Title"></b><span class="home-lights" aria-hidden="true"><i class="mini lvl-green">✓</i><i class="mini lvl-yellow">!</i><i class="mini lvl-red">✕</i></span><span data-i18n="homeHow3"></span></li>
+          <li><span class="step-n" aria-hidden="true">1</span><b data-i18n="homeHow1Title"></b><span data-i18n="homeHow1"></span></li>
+          <li><span class="step-n" aria-hidden="true">2</span><b data-i18n="homeHow2Title"></b><span data-i18n="homeHow2"></span></li>
+          <li><span class="step-n" aria-hidden="true">3</span><b data-i18n="homeHow3Title"></b><span data-i18n="homeHow3"></span>
+            <span class="home-lights" aria-hidden="true"><i class="mini lvl-green">✓</i><i class="mini lvl-yellow">!</i><i class="mini lvl-red">✕</i></span></li>
         </ol>
       </div>
     </section>
 
-    <!-- The two data sources side by side -->
+    <!-- Seven sources, one tile each -->
     <section class="home-section">
       <div class="home-wrap">
-        <h2 data-i18n="homeDataTitle">Two kinds of data</h2>
-        <div class="home-sources">
-          <article class="home-source">
-            <h3 data-i18n="homeLiveTitle"></h3>
-            <p data-i18n="homeLiveText"></p>
-            <dl>
-              <div><dt data-i18n="homeWhere"></dt><dd data-i18n="homeLiveWhere"></dd></div>
-              <div><dt data-i18n="homeDetail"></dt><dd data-i18n="homeLiveDetail"></dd></div>
-              <div><dt data-i18n="homeFresh"></dt><dd data-i18n="homeLiveFresh"></dd></div>
-            </dl>
-            <a class="home-button" href="check.html" data-i18n="homeOpenMapButton">Open the map</a>
-          </article>
-          <article class="home-source">
-            <h3 data-i18n="homeSatTitle"></h3>
-            <p data-i18n="homeSatText"></p>
-            <dl>
-              <div><dt data-i18n="homeWhere"></dt><dd data-i18n="homeSatWhere"></dd></div>
-              <div><dt data-i18n="homeDetail"></dt><dd data-i18n="homeSatDetail"></dd></div>
-              <div><dt data-i18n="homeFresh"></dt><dd data-i18n="homeSatFresh"></dd></div>
-            </dl>
-            <a class="home-button secondary" href="check.html" data-i18n="homeSeeCases">See them on the map</a>
-          </article>
-        </div>
+        <h2 data-i18n="homeSourcesTitle">Seven sources, one answer</h2>
+        <p class="home-intro" data-i18n="homeSourcesIntro"></p>
+        <ul class="source-tiles">
+          <li><b data-i18n="srcShort_sat"></b><span data-i18n="tileSat"></span></li>
+          <li><b data-i18n="srcShort_era"></b><span data-i18n="tileEra"></span></li>
+          <li><b data-i18n="srcShort_merra"></b><span data-i18n="tileMerra"></span></li>
+          <li><b data-i18n="srcShort_river"></b><span data-i18n="tileRiver"></span></li>
+          <li class="cause"><b data-i18n="srcShort_rain"></b><span data-i18n="tileRain"></span></li>
+          <li class="cause"><b data-i18n="srcShort_balance"></b><span data-i18n="tileBalance"></span></li>
+          <li class="cause"><b data-i18n="srcShort_heat"></b><span data-i18n="tileHeat"></span></li>
+          <li class="official-tile"><b data-i18n="tileOfficialTitle"></b><span data-i18n="tileOfficial"></span></li>
+        </ul>
       </div>
     </section>
 
-    <!-- Case studies: filled from data/fields.json by js/home.js -->
+    <!-- Proof -->
+    <section class="home-section home-results">
+      <div class="home-wrap">
+        <h2 data-i18n="homeResultsTitle">How well it works</h2>
+        <div class="home-figures">
+          <p><b>5 / 6</b><span data-i18n="homeFig1"></span></p>
+          <p><b data-i18n="homeFig2Value">24 days</b><span data-i18n="homeFig2"></span></p>
+          <p><b>4 / 6</b><span data-i18n="homeFig3b"></span></p>
+        </div>
+        <a class="button" href="summary.html" data-i18n="homeResultsLink">Read the full results</a>
+      </div>
+    </section>
+
+    <!-- Farm regions, opened for the current year -->
     <section class="home-section" id="cases">
       <div class="home-wrap">
         <h2 data-i18n="homeCasesTitle">Farm regions to check now</h2>
@@ -113,29 +118,17 @@
         <ul id="home-cases" class="home-cases"></ul>
       </div>
     </section>
-
-    <!-- Results in one line, with the full page for judges -->
-    <section class="home-section home-results">
-      <div class="home-wrap">
-        <h2 data-i18n="homeResultsTitle">What the tests showed</h2>
-        <div class="home-figures">
-          <p><b>5 / 6</b><span data-i18n="homeFig1"></span></p>
-          <p><b data-i18n="homeFig2Value">24 days</b><span data-i18n="homeFig2"></span></p>
-          <p><b>10 / 12</b><span data-i18n="homeFig3"></span></p>
-        </div>
-        <a class="home-button secondary" href="summary.html" data-i18n="homeResultsLink">Read the full results</a>
-      </div>
-    </section>
   </main>
 
-  <footer class="footer home-footer">
-    <p><a href="check.html" data-i18n="navMap">Map</a> · <a href="summary.html" data-i18n="navResults">Results</a> · <a href="tests.html">Tests</a></p>
-    <p data-i18n="homeCredits"></p>
-    <details class="phone-qr" id="phone-qr">
-      <summary><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="2" width="12" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="qrOpen">Open on your phone</span></summary>
-      <div class="qr-box"><div id="qr"></div><p data-i18n="qrHint"></p></div>
-    </details>
-
+  <footer class="home-footer">
+    <div class="home-wrap">
+      <p><a href="check.html" data-i18n="navMap">Map</a> · <a href="summary.html" data-i18n="navResults">Results</a> · <a href="tests.html">Tests</a></p>
+      <p data-i18n="homeCredits"></p>
+      <details class="phone-qr" id="phone-qr">
+        <summary><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="2" width="12" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span data-i18n="qrOpen">Open on your phone</span></summary>
+        <div class="qr-box"><div id="qr"></div><p data-i18n="qrHint"></p></div>
+      </details>
+    </div>
   </footer>
 </body>
 </html>
