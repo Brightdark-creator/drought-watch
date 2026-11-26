@@ -19,6 +19,8 @@
  *   loadSeries = (field) => fetch(`https://my-api/series?lat=${field.lat}&lon=${field.lon}`)...
  */
 
+import { seasonAndPeriod, periodStart } from './analysis.js';
+
 const DATA_URL = 'data/';
 
 /** A click or search result closer than this to a test field selects it. */
@@ -34,7 +36,7 @@ export async function listFields() {
 
 const seriesCache = new Map(); // field id -> Promise (each file is loaded only once)
 
-/** An error the app can translate: code = 'columns' | 'tooFew' | 'unreadable'. */
+/** An error the app can translate: code = 'columns' | 'tooFew' | 'unreadable' | 'live' | 'liveEmpty'. */
 export class DataError extends Error {
   constructor(code, params = {}) {
     super(code);
@@ -171,6 +173,7 @@ export function readLocation(text) {
 /** Load all measurements of one field, sorted by date. */
 export function loadSeries(field) {
   if (field.uploaded) return Promise.resolve(uploads.get(field.id) || []);
+  if (field.live) return Promise.resolve(field.rows);
   if (!seriesCache.has(field.id)) {
     const promise = fetch(DATA_URL + field.file)
       .then((response) => {
@@ -283,4 +286,104 @@ function splitCsvLine(line) {
   }
   cells.push(cell);
   return cells;
+}
+
+/* ---------- Live data for ANY place (weather model, updated daily) ---------- */
+
+/**
+ * Anywhere on Earth, without satellite files: soil water from ERA5-Land, the
+ * European weather model's land reanalysis (it blends in real measurements;
+ * about 9 km grid, back to 1950, up to a few days ago), served free and
+ * without a key by Open-Meteo. One request returns 16 years of daily values.
+ *
+ * The two values take the places of the satellite indices, with the same
+ * roles: topsoil water (0–7 cm) dries out first, like leaf water (NDMI), and
+ * root-zone water (0–100 cm) follows, like greenness (NDVI). Daily values are
+ * averaged per 10-day period, the analysis then works exactly as for fields.
+ */
+const OPEN_METEO = 'https://archive-api.open-meteo.com/v1/archive';
+export const LIVE_YEARS = 16;          // years downloaded: the season to check + 15 normal years (Open-Meteo counts long requests as several calls)
+export const LIVE_NORMAL_YEARS = 15;   // normal years = the 15 seasons before the one checked
+const liveCache = new Map();
+
+export function liveId(lat, lon) {
+  return `live-${lat.toFixed(2)}_${lon.toFixed(2)}`; // ~1 km: same click, same place
+}
+
+/** Builds the field for a place and downloads its data. Returns the field. */
+export async function loadLivePlace(lat, lon, name = null) {
+  const id = liveId(lat, lon);
+  if (!liveCache.has(id)) {
+    const today = new Date();
+    const start = `${today.getUTCFullYear() - LIVE_YEARS}-01-01`;
+    const url = `${OPEN_METEO}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&start_date=${start}`
+      + `&end_date=${today.toISOString().slice(0, 10)}&daily=soil_moisture_0_to_7cm_mean,soil_moisture_0_to_100cm_mean&timezone=GMT`;
+    const promise = fetch(url).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new DataError(response.status === 429 ? 'liveBusy' : 'live', { reason: body.reason || `HTTP ${response.status}` });
+      return body;
+    });
+    promise.catch(() => liveCache.delete(id));
+    liveCache.set(id, promise);
+  }
+  const body = await liveCache.get(id);
+  const startMonth = lat < 0 ? 7 : 1; // southern hemisphere: seasons run July to June
+  const rows = liveRows(body.daily, startMonth);
+  if (rows.length < 36 * 4) throw new DataError('liveEmpty');
+  const seasons = [...new Set(rows.map((r) => seasonAndPeriod(r.date, startMonth).season))].sort((a, b) => a - b);
+  const season = seasons[seasons.length - 1];
+  return {
+    id, live: true, lat, lon,
+    name: { en: name || formatCoords(lat, lon) },
+    short: { en: name ? name.split(',')[0] : formatCoords(lat, lon) },
+    crop: 'unknown',
+    season,
+    seasonStartMonth: startMonth,
+    normalYears: seasons.filter((s) => s < season).slice(-LIVE_NORMAL_YEARS),
+    allYear: true,     // a soil drought counts in every month, not only in the growing season
+    sdFloor: 0.005,    // m³/m³: below this the soil-water swings are model noise
+    gridKm: 9,
+    sources: [
+      { title: 'Open-Meteo Historical Weather API (ERA5-Land)', url: 'https://open-meteo.com/en/docs/historical-weather-api' },
+      { title: 'ERA5-Land, Copernicus Climate Change Service', url: 'https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land' },
+    ],
+    elevation: body.elevation,
+    // The model cell (about 9 km) as an outline on the map: the value is for this whole square
+    polygon: square(body.latitude ?? lat, body.longitude ?? lon, 9),
+    rows,
+  };
+}
+
+/** Daily values -> one row per 10-day period (mean), in the shape the analysis expects. */
+function liveRows(daily, startMonth) {
+  const sums = new Map();
+  daily.time.forEach((day, i) => {
+    const top = daily.soil_moisture_0_to_7cm_mean[i];
+    const root = daily.soil_moisture_0_to_100cm_mean[i];
+    if (top == null || root == null) return;
+    const { season, period } = seasonAndPeriod(new Date(`${day}T00:00:00Z`), startMonth);
+    const key = `${season}:${period}`;
+    const s = sums.get(key) || { season, period, top: 0, root: 0, n: 0 };
+    s.top += top; s.root += root; s.n += 1;
+    sums.set(key, s);
+  });
+  return [...sums.values()]
+    .filter((s) => s.n >= 5) // at least half a period of days
+    .map((s) => ({
+      date: periodStart(s.season, s.period, startMonth),
+      ndvi: s.root / s.n,   // slot 1: root-zone water (confirms, like greenness)
+      ndmi: s.top / s.n,    // slot 2: topsoil water (warns first, like leaf water)
+    }))
+    .filter((r) => r.ndvi > 0.005) // all-zero cells are ice, rock or sea
+    .sort((a, b) => a.date - b.date);
+}
+
+function square(lat, lon, km) {
+  const dLat = km / 2 / 111.32;
+  const dLon = km / 2 / (111.32 * Math.cos((lat * Math.PI) / 180));
+  return [[lat - dLat, lon - dLon], [lat - dLat, lon + dLon], [lat + dLat, lon + dLon], [lat + dLat, lon - dLon]];
+}
+
+function formatCoords(lat, lon) {
+  return `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? 'E' : 'W'}`;
 }

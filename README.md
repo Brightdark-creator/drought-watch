@@ -15,7 +15,8 @@ data" below).
 
 ```
 drought-watch/
-├── index.html              page layout: map, warning card, timeline, charts
+├── index.html              home page: search, how it works, case studies, results
+├── check.html              the map: warning card, timeline, charts (any place or a case study)
 ├── summary.html            results for all fields on one printable page (for the judges)
 ├── tests.html              automatic tests of the science code (open in the browser)
 ├── sw.js                   offline support (service worker)

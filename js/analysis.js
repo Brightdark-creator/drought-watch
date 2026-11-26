@@ -206,7 +206,10 @@ export function analyseField(field, rows) {
   // … and for this season (gaps NOT filled: we only judge real pictures).
   const current = bySeason.get(season) || new Array(PERIODS).fill(null);
 
+  // Noise limit for the SD; soil water (m³/m³) varies less than NDVI, so a live place brings its own.
+  const sdFloor = field.sdFloor ?? SD_FLOOR;
   const result = {
+    sdFloor,
     field,
     season,
     startMonth,
@@ -227,7 +230,7 @@ export function analyseField(field, rows) {
       if (vals.length >= MIN_NORMAL_YEARS) {
         const s = meanAndSd(vals);
         mean.push(s.mean);
-        sd.push(Math.max(s.sd, SD_FLOOR));
+        sd.push(Math.max(s.sd, sdFloor));
       } else {
         mean.push(null);
         sd.push(null);
@@ -244,7 +247,9 @@ export function analyseField(field, rows) {
   const lo = Math.min(...known);
   const hi = Math.max(...known);
   const cut = lo + SEASON_SHARE * (hi - lo);
-  result.inSeason = result.ndvi.mean.map((v) => known.length > 0 && v != null && v >= cut);
+  result.inSeason = field.allYear
+    ? result.ndvi.mean.map((v) => v != null) // soil water: a drought counts in every month
+    : result.ndvi.mean.map((v) => known.length > 0 && v != null && v >= cut);
 
   // Step 3: overall traffic light per period.
   result.overall = range(PERIODS).map((p) => overallLevel(result, p));
@@ -309,7 +314,7 @@ export function checkNormalYears(result) {
         const vals = others.map((y) => result.normals[y][key][p]).filter((x) => x != null);
         if (v == null || vals.length < MIN_NORMAL_YEARS) continue;
         const s = meanAndSd(vals);
-        zs.push((v - s.mean) / Math.max(s.sd, SD_FLOOR));
+        zs.push((v - s.mean) / Math.max(s.sd, result.sdFloor ?? SD_FLOOR));
       }
       if (!zs.length) return null;
       zs.sort((a, b) => a - b);

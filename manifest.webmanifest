@@ -2,7 +2,7 @@
   "name": "Drought Watch",
   "short_name": "Drought Watch",
   "description": "Free drought early warning for crop fields from Sentinel-2 satellite data.",
-  "start_url": "./",
+  "start_url": "./check.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#e6eae3",

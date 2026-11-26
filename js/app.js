@@ -10,14 +10,14 @@ import * as Data from './data.js';
 import { analyseField, availableSeasons, checkNormalYears, peakPeriod, warningSince, leadTime, confidence, MIN_NORMAL_YEARS, SYMBOLS } from './analysis.js';
 import { plantSvg, meterHtml, timelineHtml } from './visuals.js';
 import {
-  t, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
+  t, setVariant, pick, setLanguage, getLanguage, initialLanguage, applyStaticTexts, LANGUAGES, locale,
   formatDate, formatShortDate, formatNumber, formatSigned, formatKm, formatHectares, formatList,
 } from './i18n.js';
 import { STRINGS } from './lang.js';
 import * as MapView from './map.js';
 import { IndexChart, loadChartJs } from './charts.js';
 import { drawLiteChart } from './charts-lite.js';
-import { searchPlace } from './geocode.js';
+import { searchPlace, reversePlace } from './geocode.js';
 
 /* ---------- App state (everything the screen shows comes from here) ---------- */
 const state = {
@@ -79,8 +79,16 @@ async function init() {
     analysisFor(field).then((a) => updateFieldLevel(field.id, a)).catch((e) => console.error(e));
   }
 
-  const fromUrl = new URLSearchParams(location.search).get('field');
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get('field');
   if (fromUrl && state.fields.some((f) => f.id === fromUrl)) selectField(fromUrl);
+  // A shared link to any place: ?lat=52.95&lon=10.63
+  const lat = Number(params.get('lat'));
+  const lon = Number(params.get('lon'));
+  // From the home page: a place name to search for, or "use my location"
+  if (params.get('q')) { $('search-input').value = params.get('q'); $('search').requestSubmit(); }
+  if (params.get('locate') === '1') onLocate();
+  if (params.has('lat') && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) openLivePlace(lat, lon);
 }
 
 /** Load and analyse a field once; later calls reuse the result. */
@@ -124,11 +132,15 @@ async function selectField(id) {
   if (!field) return;
   hideMessage();
   state.selectedId = id;
+  // Live places show soil water instead of satellite indices: switch every label at once
+  setVariant(field.live ? 'live' : '');
+  applyStaticTexts();
   renderChips();
   renderCard({ loading: true });
   if (!state.light) MapView.focusField(field);
   // Shareable link for test fields; an uploaded file only exists on this device.
-  history.replaceState(null, '', field.uploaded ? location.pathname : `?field=${encodeURIComponent(id)}`);
+  history.replaceState(null, '', field.uploaded ? location.pathname
+    : field.live ? `?lat=${field.lat.toFixed(4)}&lon=${field.lon.toFixed(4)}` : `?field=${encodeURIComponent(id)}`);
 
   let a;
   try {
@@ -162,16 +174,32 @@ function playEntrance() {
 }
 
 /** A point on the map or a search result: select the field there, if we have one. */
-async function chooseLocation(lat, lon) {
-  const found = await Data.findField(state.fields, lat, lon);
-  if (!found) return;
-  if (found.exact) {
-    selectField(found.field.id);
-  } else {
-    showMessage(
-      t('noDataHere', { name: pick(found.field.short), distance: formatKm(found.km) }),
-      { label: t('showIt'), run: () => selectField(found.field.id) },
-    );
+async function chooseLocation(lat, lon, name = null) {
+  // A satellite case study right here? Open it. Anywhere else: live soil-water data.
+  const found = await Data.findField(state.fields.filter((f) => !f.live), lat, lon);
+  if (found?.exact) selectField(found.field.id);
+  else openLivePlace(lat, lon, name);
+}
+
+/** Any place on Earth: download its soil-water history and open it like a field. */
+async function openLivePlace(lat, lon, name = null) {
+  showMessage(t('liveLoading'));
+  try {
+    const [placeName] = await Promise.all([name ?? reversePlace(lat, lon, getLanguage()), Data.loadLivePlace(lat, lon)]);
+    const field = await Data.loadLivePlace(lat, lon, placeName); // cached: no second download
+    // One live place at a time on the map and in the list
+    for (const old of state.fields.filter((f) => f.live && f.id !== field.id)) {
+      state.analyses.delete(old.id);
+      MapView.removeField(old.id);
+    }
+    state.fields = [...state.fields.filter((f) => !f.live), field];
+    if (!state.light) MapView.addField(field, (f) => pick(f.name));
+    hideMessage();
+    await selectField(field.id);
+    analysisFor(field).then((a) => updateFieldLevel(field.id, a)).catch(() => {});
+  } catch (error) {
+    console.error(error);
+    showMessage(t(['liveEmpty', 'liveBusy'].includes(error.code) ? error.code : 'liveError'));
   }
 }
 
@@ -193,7 +221,7 @@ async function onSearch(event) {
     if (!place) { showMessage(t('notFound', { query })); return; }
     MapView.flyTo(place.lat, place.lon, 11);
     hideMessage();
-    chooseLocation(place.lat, place.lon);
+    chooseLocation(place.lat, place.lon, place.name.split(',').slice(0, 3).join(',').trim());
   } catch (error) {
     console.error(error);
     showMessage(t('searchError'));
@@ -268,7 +296,9 @@ async function renderCard({ loading = false } = {}) {
   const crop = t(`crop_${field.crop}`);
   const meta = [
     `<b>${esc(pick(field.name))}</b>`,
-    field.uploaded
+    field.live
+      ? esc(t('liveKind', { km: field.gridKm }))
+      : field.uploaded
       ? `<em>${esc(t('fromYourFile'))}</em>`
       : `${esc(crop.startsWith('crop_') ? t('crop_unknown') : crop)}${field.areaHa ? ' · ' + esc(formatHectares(field.areaHa)) : ''}${field.simulated ? ` · <em>${esc(t('simulated'))}</em>` : ''}`,
   ];
@@ -294,7 +324,7 @@ async function renderCard({ loading = false } = {}) {
       ${confidenceKpi(confidence(a, p))}
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
-    <p class="meta">${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+    <p class="meta">${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
 
 /** Links to the reports that describe what really happened (from fields.json). */
@@ -567,9 +597,12 @@ async function onUpload(file) {
 async function renderUploadSettings(a) {
   const field = currentField();
   const panel = $('upload-settings');
-  panel.hidden = !field?.uploaded;
-  if (!field?.uploaded) return;
-  $('up-keep').checked = Data.isUploadKept(field.id);
+  // Uploaded files and live places can pick their season and normal years (any year back to 20 years ago)
+  panel.hidden = !(field?.uploaded || field?.live);
+  if (panel.hidden) return;
+  panel.querySelector('.keep-check').hidden = !field.uploaded; // nothing to keep or remove for a live place
+  $('up-remove').hidden = !field.uploaded;
+  $('up-keep').checked = !!field.uploaded && Data.isUploadKept(field.id);
   const start = field.seasonStartMonth || 1;
   $('up-start').innerHTML = Array.from({ length: 12 }, (_, i) => i + 1)
     .map((m) => `<option value="${m}"${m === start ? ' selected' : ''}>${esc(formatDate(new Date(Date.UTC(2000, m - 1, 1)), { month: 'long' }))}</option>`)
@@ -595,9 +628,9 @@ async function renderUploadSettings(a) {
 /** Apply new settings to the uploaded file and analyse it again. */
 function changeUploadSettings(change) {
   const field = currentField();
-  if (!field?.uploaded) return;
+  if (!field?.uploaded && !field?.live) return;
   Object.assign(field, change);
-  if (Data.isUploadKept(field.id)) Data.keepUpload(field); // save the new settings too
+  if (field.uploaded && Data.isUploadKept(field.id)) Data.keepUpload(field); // save the new settings too
   state.analyses.delete(field.id);
   selectField(field.id).then(() => analysisFor(field).then((a) => updateFieldLevel(field.id, a)));
 }

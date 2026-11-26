@@ -27,8 +27,17 @@ export function getLanguage() {
 }
 
 /** Translate a key. "{name}" in the text is replaced by params.name. */
+/**
+ * Text variant: 'live' while a place with weather-model data is open. Then
+ * t('ndviName') first looks for 'ndviName_live' ("Root-zone water" instead of
+ * "Greenness"), so every label, meter and chart switches with one setting.
+ */
+let variant = '';
+export function setVariant(name = '') { variant = name; }
+
 export function t(key, params = {}) {
-  const text = STRINGS[current][key] ?? STRINGS.en[key] ?? key;
+  const k = variant && (STRINGS[current][`${key}_${variant}`] ?? STRINGS.en[`${key}_${variant}`]) != null ? `${key}_${variant}` : key;
+  const text = STRINGS[current][k] ?? STRINGS.en[k] ?? key;
   return text.replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
 }
 
