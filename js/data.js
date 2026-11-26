@@ -36,7 +36,7 @@ export async function listFields() {
 
 const seriesCache = new Map(); // field id -> Promise (each file is loaded only once)
 
-/** An error the app can translate: code = 'columns' | 'tooFew' | 'unreadable' | 'live' | 'liveEmpty'. */
+/** An error the app can translate: code = 'columns' | 'tooFew' | 'unreadable' | 'live' | 'liveEmpty' | 'liveBusy' | 'areaTooBig'. */
 export class DataError extends Error {
   constructor(code, params = {}) {
     super(code);
@@ -240,13 +240,17 @@ export function parseJsonRows(list) {
   return clean(list.map((r) => makeRow(r.date, r.NDVI ?? r.ndvi, r.NDMI ?? r.ndmi)));
 }
 
+// NDVI and NDMI are ratios between −1 and 1. Anything outside is a broken
+// picture (e.g. almost no light in winter, so it divides by nearly zero): dropped.
+const usable = (v) => Number.isFinite(v) && v >= -1 && v <= 1;
+
 function makeRow(dateText, ndviText, ndmiText) {
   const ndvi = parseFloat(ndviText);
   const ndmi = parseFloat(ndmiText);
   return {
     date: parseDate(dateText),
-    ndvi: Number.isFinite(ndvi) ? ndvi : null,
-    ndmi: Number.isFinite(ndmi) ? ndmi : null,
+    ndvi: usable(ndvi) ? ndvi : null,
+    ndmi: usable(ndmi) ? ndmi : null,
   };
 }
 
@@ -386,4 +390,80 @@ function square(lat, lon, km) {
 
 function formatCoords(lat, lon) {
   return `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? 'E' : 'W'}`;
+}
+
+/* ---------- Live data for an AREA (dragged on the map) ---------- */
+
+/**
+ * An area is sampled at up to 4 points, one per part of the rectangle, each
+ * at least one model square (9 km) apart. Why only 4: the free service allows
+ * about 600 "units" per minute and 16 years at one point cost about 90, so 4
+ * points stay well inside one minute. The area's value per period is the mean
+ * of its points; the card also says how many points are red or yellow.
+ */
+export const AREA_MAX_POINTS = 4;
+export const AREA_MAX_KM = 300;
+
+/** Width and height of a { south, west, north, east } box in km. */
+export function areaSizeKm(b) {
+  const midLat = ((b.south + b.north) / 2) * (Math.PI / 180);
+  return { w: (b.east - b.west) * 111.32 * Math.cos(midLat), h: (b.north - b.south) * 111.32 };
+}
+
+/** Sample points: a cols × rows grid (cols·rows ≤ 4) with one point in the middle of each cell. */
+export function areaPoints(b) {
+  const { w, h } = areaSizeKm(b);
+  let cols = Math.min(4, Math.max(1, Math.round(w / 9)));
+  let rows = Math.min(4, Math.max(1, Math.round(h / 9)));
+  while (cols * rows > AREA_MAX_POINTS) { if (cols >= rows) cols -= 1; else rows -= 1; }
+  const points = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      points.push({
+        lat: b.south + ((r + 0.5) * (b.north - b.south)) / rows,
+        lon: b.west + ((c + 0.5) * (b.east - b.west)) / cols,
+      });
+    }
+  }
+  return points;
+}
+
+export function areaId(b) {
+  return `area-${[b.south, b.west, b.north, b.east].map((v) => v.toFixed(2)).join('_')}`;
+}
+
+/** Downloads every sample point (cached per point) and builds one field for the whole area. */
+export async function loadLiveArea(b, name = null) {
+  const { w, h } = areaSizeKm(b);
+  if (Math.max(w, h) > AREA_MAX_KM) throw new DataError('areaTooBig', { km: AREA_MAX_KM });
+  const points = await Promise.all(areaPoints(b).map((p) => loadLivePlace(p.lat, p.lon)));
+  // Mean of the points, only for periods every point has (sea points have no data and fail above)
+  const byDate = new Map();
+  for (const point of points) {
+    for (const row of point.rows) {
+      const key = row.date.getTime();
+      const s = byDate.get(key) || { date: row.date, ndvi: 0, ndmi: 0, n: 0 };
+      s.ndvi += row.ndvi; s.ndmi += row.ndmi; s.n += 1;
+      byDate.set(key, s);
+    }
+  }
+  const rows = [...byDate.values()].filter((s) => s.n === points.length)
+    .map((s) => ({ date: s.date, ndvi: s.ndvi / s.n, ndmi: s.ndmi / s.n }))
+    .sort((x, y) => x.date - y.date);
+  const lat = (b.south + b.north) / 2;
+  const lon = (b.west + b.east) / 2;
+  const label = name || `${Math.round(w)} × ${Math.round(h)} km`;
+  return {
+    ...points[0], // same season, start month, normal years and sources as a single place
+    id: areaId(b),
+    area: true,
+    bounds: b,
+    lat, lon,
+    name: { en: label },
+    short: { en: label.split(',')[0] },
+    sizeKm: { w, h },
+    points,
+    polygon: [[b.south, b.west], [b.south, b.east], [b.north, b.east], [b.north, b.west]],
+    rows,
+  };
 }

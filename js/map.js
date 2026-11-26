@@ -51,6 +51,7 @@ function loadLeaflet() {
  * Create the map in `container`.
  * handlers.onFieldClick(id)        a field pin or outline was clicked
  * handlers.onMapClick(lat, lon)    somewhere else on the map was clicked
+ * handlers.onAreaSelect(box)       an area was dragged: { south, west, north, east }
  */
 export async function initMap(container, newHandlers, labels) {
   handlers = newHandlers;
@@ -80,12 +81,17 @@ export async function initMap(container, newHandlers, labels) {
     try { localStorage.setItem('dw.base', baseName); } catch { /* not important */ }
     for (const pin of pins.values()) pin.outline?.setStyle(OUTLINE[baseName]);
   });
-  map.on('click', (e) => handlers.onMapClick?.(e.latlng.lat, e.latlng.lng));
+  map.on('click', (e) => {
+    if (justDrew) return; // the click that ends a drag is not a "check this point"
+    handlers.onMapClick?.(e.latlng.lat, e.latlng.lng);
+  });
+  installAreaTool();
 }
 
 /** (Re)build the Satellite/Map switch with texts in the current language. */
 export function setLayerLabels(labels) {
   if (!map || !labels) return;
+  setAreaLabels(labels);
   layerControl?.remove();
   layerControl = L.control.layers({ [labels.satellite]: layers.satellite, [labels.map]: layers.map }, null, { collapsed: false, position: 'topright' }).addTo(map);
 }
@@ -182,4 +188,97 @@ export function flyTo(lat, lon, zoom = 11) {
 /** No flying animation in a hidden tab (it would freeze halfway) or if the user asked for less motion. */
 function canAnimate() {
   return !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+
+/* ---------- Drag to select an area ----------
+   "Select area" (or Shift + drag) turns dragging into drawing: press, drag a
+   rectangle, let go. Pointer events, so mouse, finger and pen all work.
+   "Check this view" does the same for the visible map, for keyboard users. */
+let areaMode = false;
+let draft = null;      // the dashed rectangle while drawing
+let justDrew = false;
+let areaControl = null;
+let areaLabels = { draw: 'Select area', active: 'Drag on the map', view: 'Check this view', hint: '' };
+
+function installAreaTool() {
+  map.boxZoom.disable(); // Shift + drag draws an area instead of zooming
+  const box = map.getContainer();
+  let start = null;
+  const toLatLng = (e) => map.containerPointToLatLng(map.mouseEventToContainerPoint(e));
+
+  box.addEventListener('pointerdown', (e) => {
+    if (!(areaMode || e.shiftKey) || e.button !== 0 || e.target.closest('.leaflet-control')) return;
+    e.preventDefault();
+    e.stopPropagation(); // Leaflet must not start panning
+    map.dragging.disable();
+    start = toLatLng(e);
+    draft?.remove();
+    draft = L.rectangle([start, start], { color: '#ffd166', weight: 2.5, dashArray: '6 5', fillOpacity: 0.12, interactive: false }).addTo(map);
+    box.setPointerCapture?.(e.pointerId);
+  }, true);
+
+  box.addEventListener('pointermove', (e) => {
+    if (start) draft.setBounds(L.latLngBounds(start, toLatLng(e)));
+  }, true);
+
+  const finish = (e) => {
+    if (!start) return;
+    const bounds = L.latLngBounds(start, toLatLng(e));
+    start = null;
+    map.dragging.enable();
+    justDrew = true;
+    setTimeout(() => { justDrew = false; }, 60);
+    const a = map.latLngToContainerPoint(bounds.getSouthWest());
+    const b = map.latLngToContainerPoint(bounds.getNorthEast());
+    if (Math.abs(a.x - b.x) < 12 || Math.abs(a.y - b.y) < 12) { clearDraft(); return; } // a tap, not a drag
+    setAreaMode(false);
+    handlers.onAreaSelect?.(boxOf(bounds));
+  };
+  box.addEventListener('pointerup', finish, true);
+  box.addEventListener('pointercancel', () => { start = null; map.dragging.enable(); clearDraft(); }, true);
+}
+
+const boxOf = (bounds) => ({
+  south: bounds.getSouth(), west: L.Util.wrapNum(bounds.getWest(), [-180, 180], true),
+  north: bounds.getNorth(), east: L.Util.wrapNum(bounds.getEast(), [-180, 180], true),
+});
+
+export function clearDraft() {
+  draft?.remove();
+  draft = null;
+}
+
+export function setAreaMode(on) {
+  areaMode = on;
+  map?.getContainer().classList.toggle('area-mode', on);
+  const button = areaControl?.getContainer().querySelector('.area-draw');
+  if (button) {
+    button.setAttribute('aria-pressed', String(on));
+    button.querySelector('span').textContent = on ? areaLabels.active : areaLabels.draw;
+  }
+}
+
+function setAreaLabels(labels) {
+  areaLabels = { ...areaLabels, ...labels.area };
+  areaControl?.remove();
+  const AreaControl = L.Control.extend({
+    onAdd() {
+      const div = L.DomUtil.create('div', 'leaflet-bar area-control');
+      div.innerHTML = `
+        <button type="button" class="area-draw" aria-pressed="${areaMode}" title="${areaLabels.hint}">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>${areaMode ? areaLabels.active : areaLabels.draw}</span>
+        </button>
+        <button type="button" class="area-view">${areaLabels.view}</button>`;
+      L.DomEvent.disableClickPropagation(div);
+      div.querySelector('.area-draw').addEventListener('click', () => setAreaMode(!areaMode));
+      div.querySelector('.area-view').addEventListener('click', () => {
+        setAreaMode(false);
+        handlers.onAreaSelect?.(boxOf(map.getBounds().pad(-0.1))); // a bit inside the edges
+      });
+      return div;
+    },
+  });
+  areaControl = new AreaControl({ position: 'topleft' }).addTo(map);
 }

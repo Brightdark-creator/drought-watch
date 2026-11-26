@@ -88,6 +88,9 @@ async function init() {
   // From the home page: a place name to search for, or "use my location"
   if (params.get('q')) { $('search-input').value = params.get('q'); $('search').requestSubmit(); }
   if (params.get('locate') === '1') onLocate();
+  // A shared area: ?area=south,west,north,east
+  const area = (params.get('area') || '').split(',').map(Number);
+  if (area.length === 4 && area.every(Number.isFinite)) openLiveArea({ south: area[0], west: area[1], north: area[2], east: area[3] });
   if (params.has('lat') && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) openLivePlace(lat, lon);
 }
 
@@ -140,6 +143,7 @@ async function selectField(id) {
   if (!state.light) MapView.focusField(field);
   // Shareable link for test fields; an uploaded file only exists on this device.
   history.replaceState(null, '', field.uploaded ? location.pathname
+    : field.area ? `?area=${[field.bounds.south, field.bounds.west, field.bounds.north, field.bounds.east].map((v) => v.toFixed(3)).join(',')}`
     : field.live ? `?lat=${field.lat.toFixed(4)}&lon=${field.lon.toFixed(4)}` : `?field=${encodeURIComponent(id)}`);
 
   let a;
@@ -182,12 +186,30 @@ async function chooseLocation(lat, lon, name = null) {
 }
 
 /** Any place on Earth: download its soil-water history and open it like a field. */
-async function openLivePlace(lat, lon, name = null) {
-  showMessage(t('liveLoading'));
-  try {
+function openLivePlace(lat, lon, name = null) {
+  return openLive(t('liveLoading'), async () => {
     const [placeName] = await Promise.all([name ?? reversePlace(lat, lon, getLanguage()), Data.loadLivePlace(lat, lon)]);
-    const field = await Data.loadLivePlace(lat, lon, placeName); // cached: no second download
-    // One live place at a time on the map and in the list
+    return Data.loadLivePlace(lat, lon, placeName); // cached: no second download
+  });
+}
+
+/** A dragged area: up to 4 sample points, averaged. */
+function openLiveArea(box) {
+  const n = Data.areaPoints(box).length;
+  return openLive(t('areaLoading', { n }), async () => {
+    const lat = (box.south + box.north) / 2;
+    const lon = (box.west + box.east) / 2;
+    const [placeName] = await Promise.all([reversePlace(lat, lon, getLanguage()), Data.loadLiveArea(box)]);
+    return Data.loadLiveArea(box, placeName ? t('areaAround', { name: placeName }) : null);
+  });
+}
+
+async function openLive(loadingText, load) {
+  showMessage(loadingText);
+  try {
+    const field = await load();
+    MapView.clearDraft();
+    // One live place or area at a time on the map and in the list
     for (const old of state.fields.filter((f) => f.live && f.id !== field.id)) {
       state.analyses.delete(old.id);
       MapView.removeField(old.id);
@@ -199,7 +221,8 @@ async function openLivePlace(lat, lon, name = null) {
     analysisFor(field).then((a) => updateFieldLevel(field.id, a)).catch(() => {});
   } catch (error) {
     console.error(error);
-    showMessage(t(['liveEmpty', 'liveBusy'].includes(error.code) ? error.code : 'liveError'));
+    MapView.clearDraft();
+    showMessage(t(['liveEmpty', 'liveBusy', 'areaTooBig'].includes(error.code) ? error.code : 'liveError', error.params || {}));
   }
 }
 
@@ -296,7 +319,9 @@ async function renderCard({ loading = false } = {}) {
   const crop = t(`crop_${field.crop}`);
   const meta = [
     `<b>${esc(pick(field.name))}</b>`,
-    field.live
+    field.area
+      ? esc(t('areaKind', { w: Math.round(field.sizeKm.w), h: Math.round(field.sizeKm.h) }))
+      : field.live
       ? esc(t('liveKind', { km: field.gridKm }))
       : field.uploaded
       ? `<em>${esc(t('fromYourFile'))}</em>`
@@ -324,10 +349,23 @@ async function renderCard({ loading = false } = {}) {
       ${confidenceKpi(confidence(a, p))}
     </div>
     <div class="meters">${meter('ndmi')}${meter('ndvi')}</div>
-    <p class="meta">${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
+    <p class="meta">${field.area ? `${esc(areaSpread(field, p))}<br>` : ''}${field.live ? `${esc(t('liveSource', { km: field.gridKm }))} ${sourceLinks(field)}<br>` : ''}${field.event ? `<b>${esc(t('eventLabel'))}:</b> ${esc(pick(field.event))} ${sourceLinks(field)}<br>` : ''}${esc(t('comparedWith', { years: formatList(a.normalYears) }))}</p>`;
 }
 
 /** Links to the reports that describe what really happened (from fields.json). */
+/** "Average of 4 sample points: 2 red, 1 yellow, 1 green" (same season and normal years as the area). */
+function areaSpread(field, p) {
+  if (p == null) return '';
+  const counts = { red: 0, yellow: 0, green: 0 };
+  for (const point of field.points) {
+    const a = analyseField({ ...point, season: field.season, seasonStartMonth: field.seasonStartMonth, normalYears: field.normalYears }, point.rows);
+    const level = a.overall[p];
+    if (level in counts) counts[level] += 1;
+  }
+  const parts = ['red', 'yellow', 'green'].filter((l) => counts[l]).map((l) => t(`areaCount_${l}`, { n: counts[l] }));
+  return t('areaSpread', { n: field.points.length, parts: parts.join(', ') || '–' });
+}
+
 function sourceLinks(field) {
   if (!field.sources?.length) return '';
   return `<span class="sources">${esc(t('sourcesLabel'))}: ${field.sources
@@ -372,16 +410,26 @@ function renderSpace() {
   const kind = state.spaceKind;
   document.querySelectorAll('.space-tabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
   $('ndvi-scale').hidden = kind !== 'ndvi';
-  const fig = (role) => {
+  // One frame, two pictures of the same square: drag the handle to wipe from the normal year to the drought year
+  const info = (role) => {
     const img = images[role];
     const date = formatDate(new Date(`${img.date}T00:00:00Z`));
-    const alt = t('spaceAlt', { kind: kind === 'rgb' ? t('spaceTrue') : t('spaceNdvi'), name: pick(field.short), date });
-    return `<figure>
-      <div class="space-img"><img src="data/${esc(img[kind])}" alt="${esc(alt)}" width="400" height="400" loading="lazy"></div>
-      <figcaption><b>${esc(t(role === 'normal' ? 'spaceNormal' : 'spaceDrought'))}</b>${esc(date)} · ${esc(t('spaceNdviValue', { value: formatNumber(img.ndviValue, 2) }))}</figcaption>
-    </figure>`;
+    return { img, date, alt: t('spaceAlt', { kind: kind === 'rgb' ? t('spaceTrue') : t('spaceNdvi'), name: pick(field.short), date }) };
   };
-  $('space-grid').innerHTML = fig('normal') + fig('drought');
+  const normal = info('normal');
+  const drought = info('drought');
+  const pos = state.spacePos ?? 50;
+  const caption = (role, x) => `<p><b>${esc(t(role === 'normal' ? 'spaceNormal' : 'spaceDrought'))}</b>${esc(x.date)} · ${esc(t('spaceNdviValue', { value: formatNumber(x.img.ndviValue, 2) }))}</p>`;
+  $('space-grid').innerHTML = `
+    <div class="cmp" style="--pos:${pos}%">
+      <img src="data/${esc(normal.img[kind])}" alt="${esc(normal.alt)}" width="400" height="400">
+      <img class="cmp-top" src="data/${esc(drought.img[kind])}" alt="${esc(drought.alt)}" width="400" height="400">
+      <span class="cmp-tag cmp-left" aria-hidden="true">${esc(t('spaceNormal'))}</span>
+      <span class="cmp-tag cmp-right" aria-hidden="true">${esc(t('spaceDrought'))}</span>
+      <span class="cmp-handle" aria-hidden="true"></span>
+      <input class="cmp-range" type="range" min="0" max="100" value="${pos}" aria-label="${esc(t('spaceSlider'))}">
+    </div>
+    <div class="cmp-captions">${caption('normal', normal)}${caption('drought', drought)}</div>`;
 }
 
 /** The season at a glance: one bar per 10-day period (click a bar to jump there). */
@@ -541,6 +589,7 @@ async function startMap() {
     await MapView.initMap($('map'), {
       onFieldClick: (id) => selectField(id),
       onMapClick: (lat, lon) => chooseLocation(lat, lon),
+      onAreaSelect: (box) => openLiveArea(box),
     }, layerLabels());
   } catch (error) {
     console.error(error);
@@ -556,7 +605,10 @@ async function startMap() {
   if (field) MapView.focusField(field);
 }
 
-const layerLabels = () => ({ satellite: t('layerSatellite'), map: t('layerMap') });
+const layerLabels = () => ({
+  satellite: t('layerSatellite'), map: t('layerMap'),
+  area: { draw: t('areaDraw'), active: t('areaActive'), view: t('areaView'), hint: t('areaHint') },
+});
 
 async function setLightMode(on, { save = true } = {}) {
   state.light = on;
@@ -732,6 +784,12 @@ function wireControls() {
     normalYears: [...$('up-normals').querySelectorAll('input:checked')].map((i) => Number(i.value)),
   }));
   $('up-remove').addEventListener('click', removeUpload);
+  // Compare slider: move the wipe line (no re-render, so dragging stays smooth)
+  $('space-grid').addEventListener('input', (e) => {
+    if (!e.target.classList.contains('cmp-range')) return;
+    state.spacePos = Number(e.target.value);
+    e.target.closest('.cmp').style.setProperty('--pos', `${state.spacePos}%`);
+  });
   document.querySelector('.space-tabs').addEventListener('click', (e) => {
     const button = e.target.closest('button');
     if (!button) return;

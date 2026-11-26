@@ -139,7 +139,10 @@ def picture_stats(item, feature):
     if clear < MIN_CLEAR:
         return None
     # The averages include the masked pixels as 0, so divide by the clear share.
-    return (item["properties"]["datetime"][:10], s[0]["mean"] / clear, s[1]["mean"] / clear, clear)
+    ndvi, ndmi = s[0]["mean"] / clear, s[1]["mean"] / clear
+    if not (-1 <= ndvi <= 1 and -1 <= ndmi <= 1):  # impossible ratio: a broken picture
+        return None
+    return (item["properties"]["datetime"][:10], ndvi, ndmi, clear)
 
 
 def fetch_area(name, cfg):
