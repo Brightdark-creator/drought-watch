@@ -781,3 +781,11 @@ tr.current { background: var(--accent-soft); }
 .home-world img { display: block; width: 100%; height: auto; border-radius: var(--radius-xs); background: #1d2b25; }
 .home-world .home-tag { background: rgba(13, 30, 22, 0.85); }
 .chips-row:has(.chips:empty) .chips-label { display: none; } /* no places opened yet */
+
+/* Phone fixes from the live-site test (round 11) */
+.home-nav .brand, a.brand { min-height: 44px; }                 /* 44 px tap target */
+@media (max-width: 560px) {
+  .home-search { flex-wrap: wrap; }
+  .home-search input { flex-basis: 100%; }                      /* the whole placeholder fits */
+  .home-search button[type="submit"] { flex: 1; }
+}
