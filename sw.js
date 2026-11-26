@@ -11,10 +11,10 @@
  *
  * After changing app files, raise VERSION so old copies are thrown away.
  */
-const VERSION = 'drought-watch-v18';
+const VERSION = 'drought-watch-v19';
 
 const APP_FILES = [
-  './', './index.html', './check.html', './js/home.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
+  './', './index.html', './check.html', './js/home.js', './js/qr.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/apple-touch-icon.png', './css/style.css',
   './js/app.js', './js/data.js', './js/analysis.js', './js/visuals.js', './js/charts.js',
   './js/map.js', './js/geocode.js', './js/i18n.js', './js/lang.js', './js/charts-lite.js',
   './js/summary.js', './summary.html',

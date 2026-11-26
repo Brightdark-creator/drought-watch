@@ -18,6 +18,7 @@ import * as MapView from './map.js';
 import { IndexChart, loadChartJs } from './charts.js';
 import { drawLiteChart } from './charts-lite.js';
 import { searchPlace, reversePlace } from './geocode.js';
+import { setupQr } from './qr.js';
 
 /* ---------- App state (everything the screen shows comes from here) ---------- */
 const state = {
@@ -53,6 +54,7 @@ async function init() {
   setLanguage(readPref('dw.lang', null) || initialLanguage());
   buildLanguageMenu();
   applyStaticTexts();
+  setupQr($('phone-qr'), $('qr'), () => t('qrAlt'));
 
   // Slow connection or "data saver" switched on? Then start in light mode.
   const net = navigator.connection;

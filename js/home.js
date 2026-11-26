@@ -6,6 +6,7 @@
 import * as Data from './data.js';
 import { t, pick, setLanguage, applyStaticTexts, LANGUAGES } from './i18n.js';
 import { STRINGS } from './lang.js';
+import { setupQr } from './qr.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -44,6 +45,7 @@ async function init() {
     try { localStorage.setItem('dw.lang', e.target.value); } catch { /* private window */ }
     render();
   });
+  setupQr($('phone-qr'), $('qr'), () => t('qrAlt'));
   fields = (await Data.listFields()).filter((f) => !f.simulated && f.event);
   render();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
