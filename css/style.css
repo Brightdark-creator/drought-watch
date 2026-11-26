@@ -800,3 +800,15 @@ tr.current { background: var(--accent-soft); }
 .official-verdict a { margin-left: 4px; font-weight: 500; color: var(--accent); }
 .official-officialAgree { border-left: 4px solid var(--green); }
 .official-officialDisagree { border-left: 4px solid var(--yellow-edge); }
+
+/* Small charts, one per source */
+.source-charts { margin: 8px 0 18px; }
+.source-charts[hidden] { display: none; }
+.source-charts h3 { margin: 0 0 4px; font-size: 1.15rem; font-weight: 750; }
+.source-charts-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+.src-chart { margin: 0; padding: 10px 10px 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.src-chart figcaption { font-size: 0.85rem; font-weight: 650; margin: 0 2px 6px; }
+.src-chart figcaption small { font-weight: 500; color: var(--muted); }
+.src-chart-plot { position: relative; height: 150px; }
+@media (min-width: 720px) { .source-charts-grid { grid-template-columns: repeat(3, 1fr); } }
+.cell-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; } .cell-list .mini { width: 18px; height: 18px; font-size: 11px; }

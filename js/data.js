@@ -748,11 +748,14 @@ function nearestClass(rgb, classes) {
 }
 
 /** Reads one official map at a place: { id, level, word, date } (level null = no data there). */
-async function readOfficial(o, lat, lon) {
+async function readOfficial(o, lat, lon, date = null) {
   if (o.europe && !inEurope(lat, lon)) return { id: o.id, level: null, outside: true };
+  // A past date: the maps come every 10 days (1st, 11th, 21st); GRACE has no maps by these dates
+  if (date && o.id === 'ground') return { id: o.id, level: null, outside: true };
+  const time = date ? `&TIME=${date.toISOString().slice(0, 8)}${String([1, 11, 21][Math.min(2, Math.floor((date.getUTCDate() - 1) / 10))]).padStart(2, '0')}` : '';
   const d = 0.05;
   const url = `${GDO}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=${o.layer}&STYLES=&CRS=EPSG:4326`
-    + `&BBOX=${lat - d},${lon - d},${lat + d},${lon + d}&WIDTH=5&HEIGHT=5&FORMAT=image/png&TRANSPARENT=true`;
+    + `&BBOX=${lat - d},${lon - d},${lat + d},${lon + d}&WIDTH=5&HEIGHT=5&FORMAT=image/png&TRANSPARENT=true${time}`;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.src = url;
@@ -767,11 +770,11 @@ async function readOfficial(o, lat, lon) {
   return { id: o.id, level: hit?.[0] ?? null, word: hit?.[1] ?? null };
 }
 
-/** All official maps for a place (each one may fail on its own). */
-export async function loadOfficial(lat, lon) {
+/** All official maps for a place, now or on a past date (each one may fail on its own). */
+export async function loadOfficial(lat, lon, date = null) {
   const [dates, ...results] = await Promise.all([
-    officialDates(),
-    ...OFFICIAL.map((o) => readOfficial(o, lat, lon).catch(() => ({ id: o.id, level: null, failed: true }))),
+    date ? {} : officialDates(),
+    ...OFFICIAL.map((o) => readOfficial(o, lat, lon, date).catch(() => ({ id: o.id, level: null, failed: true }))),
   ]);
-  return results.map((r) => ({ ...r, date: dates[r.id] ?? null }));
+  return results.map((r) => ({ ...r, date: date || (dates[r.id] ?? null) }));
 }

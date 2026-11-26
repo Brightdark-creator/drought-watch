@@ -802,6 +802,47 @@ async function renderCharts(a) {
     $(useLite ? `lite-${key}` : `chart-${key}`).setAttribute('aria-label', t('chartAria', { name: t(`${key}Name`), year: a.season, level: t(`level_${level}`) }));
   }
   renderLegend(a);
+  renderSourceCharts(a);
+}
+
+/**
+ * Small multiples: one light SVG chart per source that has no chart above,
+ * with the same normal band, levels and replay cut. Heat is drawn upside
+ * down (stored as −°C) turned back to °C, so up = hotter; river flow is on a
+ * log scale, labelled in m³/s.
+ */
+function renderSourceCharts(a) {
+  const field = currentField();
+  const box = $('source-charts');
+  const sources = field ? evidenceReady(field, a) : null;
+  if (!sources) {
+    box.hidden = true;
+    if (field) evidenceFor(field, a).then(() => { if (currentField() === field) renderSourceCharts(a); }).catch(() => {});
+    return;
+  }
+  const others = sources.filter((src) => src.a !== a); // the main source already has its two charts
+  box.hidden = others.length === 0;
+  const p = state.period ?? -1;
+  const grid = $('source-charts-grid');
+  grid.innerHTML = others.map((src) => `<figure class="src-chart"><figcaption>${esc(t(`src_${src.id}`))}${src.unit === 'heat' ? ` <small>${esc(t('chartHeatNote'))}</small>` : ''}</figcaption>
+    <div class="src-chart-plot" id="src-chart-${src.id}" role="img"></div></figure>`).join('');
+  for (const src of others) {
+    const s = src.a.ndvi;
+    const flip = src.unit === 'heat' ? -1 : 1;
+    const turn = (arr) => arr.map((v) => (v == null ? null : flip * v));
+    const levels = src.a.overall.map((l) => l || 'off');
+    const cut = (arr) => arr.map((v, i) => (i <= p ? v : null));
+    const format = src.unit === 'flow' ? (v) => formatNumber(10 ** v, 10 ** v < 1 ? 2 : 0)
+      : src.unit === 'mm' || src.unit === 'heat' ? (v) => formatNumber(v, 0) : (v) => formatNumber(v, 2);
+    const el = $(`src-chart-${src.id}`);
+    drawLiteChart(el, {
+      values: cut(turn(s.values)), valuesAll: turn(s.values), levels: cut(levels), mean: turn(s.mean), sd: s.sd,
+      selected: state.period, inSeason: src.a.inSeason, dates: src.a.labels,
+      monthLabel: (date) => esc(formatDate(date, { month: 'short' })), format,
+    });
+    const level = state.period == null ? 'unknown' : (levels[state.period] || 'unknown');
+    el.setAttribute('aria-label', t('chartAria', { name: t(`src_${src.id}`), year: src.a.season, level: t(`level_${level}`) }));
+  }
 }
 
 function renderLegend(a) {

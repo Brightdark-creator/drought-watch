@@ -158,18 +158,28 @@ async function renderAgreement(results) {
     // Signs vote (satellite, soil, river); rain is shown as the cause, as on the map
     const all = [sat, at(soil), at(river), at(rain)];
     const combined = combineLevels(all.slice(0, 3).map((x) => x.level));
-    return { field, a, p, all, combined };
+    // The official Copernicus maps of the same 10 days
+    const official = p == null ? [] : await Data.loadOfficial(field.lat, field.lon, a.labels[p]).catch(() => []);
+    const officialLevel = combineLevels(official.map((o) => o.level));
+    return { field, a, p, all, combined, official, officialLevel };
   }));
   const agree = rows.filter((r) => r.combined === 'red').length;
+  const officialDry = rows.filter((r) => r.officialLevel && r.officialLevel !== 'green').length;
+  const officialJudged = rows.filter((r) => r.officialLevel).length;
+  const officialCell = (r) => `<td><ul class="cell-list">${r.official.filter((o) => !o.outside).map((o) => {
+    const l = o.level || 'off';
+    return `<li><span class="mini lvl-${l}" aria-hidden="true">${SYMBOLS[l]}</span> ${esc(t(`officialShort_${o.id}`))}: ${esc(o.word ? t(o.word) : o.level ? t(`idx_${o.level}`) : t('srcNone'))}</li>`;
+  }).join('')}</ul></td>`;
   box.innerHTML = `
     <p class="lead-figure">${esc(t('agreeHeadline', { n: agree, total: rows.length }))}</p>
     <div class="table-wrap" tabindex="0" role="region" aria-label="${esc(t('agreeTitle'))}"><table>
       <thead><tr><th scope="col">${esc(t('colField'))}</th><th scope="col">${esc(t('agreeWhen'))}</th>
-        <th scope="col">${esc(t('src_sat'))}</th><th scope="col">${esc(t('src_merra'))}</th><th scope="col">${esc(t('src_river'))}</th><th scope="col">${esc(t('src_rain'))} *</th><th scope="col">${esc(t('agreeCombined'))}</th></tr></thead>
+        <th scope="col">${esc(t('src_sat'))}</th><th scope="col">${esc(t('src_merra'))}</th><th scope="col">${esc(t('src_river'))}</th><th scope="col">${esc(t('src_rain'))} *</th><th scope="col">${esc(t('agreeCombined'))}</th><th scope="col">${esc(t('agreeOfficial'))}</th></tr></thead>
       <tbody>${rows.map((r) => `<tr><th scope="row">${esc(pick(r.field.short))}</th>
         <td>${r.p == null ? '–' : esc(formatDate(r.a.dates[r.p] || r.a.labels[r.p], { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
-        ${r.all.map((x) => cell(x.level, x.z)).join('')}${cell(r.combined, null)}</tr>`).join('')}</tbody>
+        ${r.all.map((x) => cell(x.level, x.z)).join('')}${cell(r.combined, null)}${officialCell(r)}</tr>`).join('')}</tbody>
     </table></div>
+    <p class="lead-figure">${esc(t('agreeOfficialHeadline', { n: officialDry, total: officialJudged }))}</p>
     <p class="hint">${esc(t('agreeNote'))}</p>`;
 }
 
