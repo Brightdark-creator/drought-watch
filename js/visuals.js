@@ -130,26 +130,25 @@ export function timelineHtml(a, selected, monthLabel) {
  * middle repeats the level for people who cannot tell the colours apart.
  */
 export function gaugeSvg(z, level) {
-  const cx = 60; const cy = 62; const r = 48;
+  const cx = 60; const cy = 58; const r = 46;
   const angle = (v) => Math.PI * (1 - (Math.min(METER_MAX, Math.max(METER_MIN, v)) - METER_MIN) / (METER_MAX - METER_MIN));
-  const point = (v, radius) => [cx + radius * Math.cos(angle(v)), cy - radius * Math.sin(angle(v))];
-  const arc = (from, to, color) => {
-    const [x1, y1] = point(from, r);
-    const [x2, y2] = point(to, r);
-    return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="${color}" stroke-width="12" fill="none"/>`;
+  const point = (a, radius) => [cx + radius * Math.cos(a), cy - radius * Math.sin(a)];
+  const gap = 0.07; // small gaps between the zones (radians)
+  const arc = (from, to, cls) => {
+    const [x1, y1] = point(angle(from) - (from === METER_MIN ? 0 : gap / 2), r);
+    const [x2, y2] = point(angle(to) + (to === METER_MAX ? 0 : gap / 2), r);
+    return `<path class="${cls}" d="M${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}"/>`;
   };
-  const colors = { green: '#1a7f37', yellow: '#f2b705', red: '#c62828' };
-  const active = (l) => (level === l ? colors[l] : `${colors[l]}55`);
+  const zone = (l) => `gauge-zone gauge-zone-${l}${level === l ? ' on' : ''}`;
   const needle = z == null ? '' : (() => {
-    const [x, y] = point(z, r - 14);
-    return `<line class="gauge-needle" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" style="--a:${(90 - (angle(z) * 180) / Math.PI).toFixed(1)}deg"/>`;
+    const a = angle(z);
+    const [x, y] = point(a, r - 13);
+    return `<line class="gauge-needle" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" style="--a:${(90 - (a * 180) / Math.PI).toFixed(1)}deg"/>`;
   })();
-  const symbol = SYMBOLS[level] || SYMBOLS.unknown;
-  return `<svg class="gauge" viewBox="0 0 120 92" aria-hidden="true" focusable="false">
-    ${arc(METER_MIN, RED_Z, active('red'))}${arc(RED_Z, YELLOW_Z, active('yellow'))}${arc(YELLOW_Z, METER_MAX, active('green'))}
+  return `<svg class="gauge" viewBox="0 0 120 68" aria-hidden="true" focusable="false">
+    ${arc(METER_MIN, RED_Z, zone('red'))}${arc(RED_Z, YELLOW_Z, zone('yellow'))}${arc(YELLOW_Z, METER_MAX, zone('green'))}
     ${needle}
-    <circle cx="${cx}" cy="${cy}" r="7" fill="currentColor"/>
-    <text x="${cx}" y="88" text-anchor="middle" class="gauge-symbol gauge-${level}">${symbol}</text>
+    <circle class="gauge-hub" cx="${cx}" cy="${cy}" r="5.5"/>
   </svg>`;
 }
 

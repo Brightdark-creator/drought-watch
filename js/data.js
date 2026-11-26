@@ -331,7 +331,8 @@ export async function loadLivePlace(lat, lon, name = null) {
   const seasons = [...new Set(rows.map((r) => seasonAndPeriod(r.date, startMonth).season))].sort((a, b) => a - b);
   const season = seasons[seasons.length - 1];
   return {
-    id, live: true, lat, lon,
+    // The pin sits in the middle of the model square the data is for (not where the click was)
+    id, live: true, lat: body.latitude ?? lat, lon: body.longitude ?? lon,
     name: { en: name || formatCoords(lat, lon) },
     short: { en: name ? name.split(',')[0] : formatCoords(lat, lon) },
     crop: 'unknown',

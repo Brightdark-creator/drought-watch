@@ -1077,6 +1077,7 @@ const THEMES = ['dark', 'earth', 'light'];
 
 function buildThemeMenu() {
   const current = document.documentElement.dataset.theme || 'dark';
+  document.querySelectorAll('[data-theme-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themePick === current)));
   $('theme').innerHTML = THEMES
     .map((th) => `<option value="${th}"${th === current ? ' selected' : ''}>${esc(t(`theme_${th}`))}</option>`)
     .join('');
@@ -1089,6 +1090,7 @@ function setTheme(name) {
   requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('no-trans')));
   writePref('dw.theme', name);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(document.body).backgroundColor);
+  buildThemeMenu();
   rerender(); // charts and the gauge read their colours from the theme
 }
 
@@ -1121,6 +1123,13 @@ function wirePanel() {
     $('panel-toggle').setAttribute('aria-expanded', String(open));
   });
   $('theme').addEventListener('change', (e) => setTheme(e.target.value));
+  document.querySelectorAll('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themePick)));
+  // The settings menu closes on a click outside it or with Escape
+  const menu = $('settings-menu');
+  document.addEventListener('click', (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
+  });
 }
 
 function buildLanguageMenu() {

@@ -22,6 +22,7 @@ const THEMES = ['dark', 'earth', 'light'];
 
 function buildThemeMenu() {
   const current = document.documentElement.dataset.theme || 'dark';
+  document.querySelectorAll('[data-theme-pick]').forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.themePick === current)));
   $('theme').innerHTML = THEMES.map((th) => `<option value="${th}"${th === current ? ' selected' : ''}>${esc(t(`theme_${th}`))}</option>`).join('');
 }
 
@@ -82,12 +83,19 @@ async function init() {
     try { localStorage.setItem('dw.lang', e.target.value); } catch { /* private window */ }
     render();
   });
-  $('theme').addEventListener('change', (e) => {
-    document.documentElement.classList.add('no-trans');
-    document.documentElement.dataset.theme = e.target.value;
-    requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('no-trans')));
-    try { localStorage.setItem('dw.theme', e.target.value); } catch { /* private window */ }
-  });
+  const pickTheme = (name) => {
+    const root = document.documentElement;
+    root.classList.add('no-trans');
+    root.dataset.theme = name;
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('no-trans')));
+    try { localStorage.setItem('dw.theme', name); } catch { /* private window */ }
+    buildThemeMenu();
+  };
+  $('theme').addEventListener('change', (e) => pickTheme(e.target.value));
+  document.querySelectorAll('[data-theme-pick]').forEach((btn) => btn.addEventListener('click', () => pickTheme(btn.dataset.themePick)));
+  const menu = $('settings-menu');
+  document.addEventListener('click', (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); } });
   setupQr($('phone-qr'), $('qr'), () => t('qrAlt'));
   startHomeMap();
   fields = (await Data.listFields()).filter((f) => !f.simulated && f.event);
